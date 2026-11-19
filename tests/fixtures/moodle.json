@@ -1,0 +1,473 @@
+{
+  "core_webservice_get_site_info": {
+    "sitename": "Moodle de prueba",
+    "username": "estudiante",
+    "fullname": "Estudiante Prueba",
+    "userid": 42,
+    "siteurl": "https://moodle.ejemplo.cl",
+    "release": "4.1"
+  },
+  "core_enrol_get_users_courses": [
+    {
+      "id": 101,
+      "shortname": "202602_J1_C7_INF331_3732",
+      "fullname": "(202602)(INF331) PRUEBAS DE SOFTWARE|Paralelos:200",
+      "startdate": 1785000000,
+      "enddate": 1798000000,
+      "summary": ""
+    },
+    {
+      "id": 102,
+      "shortname": "202602_J1_C7_INF363_3725",
+      "fullname": "(202602)(INF363) SEMINARIO DE SISTEMAS Y GESTION|Paralelos:200",
+      "startdate": 1785000000,
+      "enddate": 1798000000
+    },
+    {
+      "id": 103,
+      "shortname": "202602_J1_C7_INF466_3758",
+      "fullname": "(202602)(INF466) INTRODUCCIÓN A LA BIOINFORMÁTICA|Paralelos:1",
+      "startdate": 1785000000,
+      "enddate": 1798000000
+    },
+    {
+      "id": 104,
+      "shortname": "202502_J1_C7_INF322_1111",
+      "fullname": "(202502)(INF322) DISEÑO DE INTERFACES USUARIAS|Paralelos:200",
+      "startdate": 1740000000,
+      "enddate": 1750000000
+    },
+    {
+      "id": 105,
+      "shortname": "202501_IWI131",
+      "fullname": "(202501)(IWI131) INTRODUCCIÓN A LA PROGRAMACIÓN|Paralelos:1/2",
+      "startdate": 1740000000,
+      "enddate": 1750000000
+    }
+  ],
+  "core_course_get_enrolled_courses_by_timeline_classification": {
+    "courses": [
+      {
+        "id": 101
+      },
+      {
+        "id": 102
+      },
+      {
+        "id": 103
+      }
+    ],
+    "nextoffset": 3
+  },
+  "core_calendar_get_action_events_by_timesort": {
+    "events": [
+      {
+        "id": 1,
+        "name": "Tarea 3 vence",
+        "activityname": "Tarea 3: Pruebas unitarias",
+        "modulename": "assign",
+        "timesort": "__AHORA_MAS_3_DIAS__",
+        "overdue": false,
+        "course": {
+          "id": 101,
+          "shortname": "202602_J1_C7_INF331_3732",
+          "fullname": "(202602)(INF331) PRUEBAS DE SOFTWARE|Paralelos:200"
+        },
+        "action": {
+          "name": "Agregar entrega",
+          "url": "https://moodle.ejemplo.cl/mod/assign/view.php?id=9001&action=editsubmission",
+          "actionable": true
+        },
+        "url": "https://moodle.ejemplo.cl/mod/assign/view.php?id=9001"
+      },
+      {
+        "id": 2,
+        "name": "Informe final vence",
+        "activityname": "Informe final",
+        "modulename": "assign",
+        "timesort": "__AHORA_MAS_5_DIAS__",
+        "overdue": false,
+        "course": {
+          "id": 102,
+          "shortname": "202602_J1_C7_INF363_3725",
+          "fullname": "(202602)(INF363) SEMINARIO DE SISTEMAS Y GESTION|Paralelos:200"
+        },
+        "action": {
+          "name": "Agregar entrega",
+          "actionable": true
+        },
+        "url": "https://moodle.ejemplo.cl/mod/assign/view.php?id=9002"
+      }
+    ],
+    "firstid": 1,
+    "lastid": 2
+  },
+  "core_course_get_contents": [
+    {
+      "id": 1,
+      "name": "General",
+      "section": 0,
+      "summary": "<p>Bienvenidos al <b>ramo</b>&nbsp;:)</p>",
+      "modules": [
+        {
+          "id": 9100,
+          "name": "Avisos",
+          "modname": "forum",
+          "uservisible": true
+        },
+        {
+          "id": 9099,
+          "name": "Equipo docente",
+          "modname": "label",
+          "uservisible": true,
+          "description": "<p>Profesora: Profesora Uno<br>Ayudante: Ana Ayudante – <a href='mailto:ana.ayudante@ejemplo.cl'>ana.ayudante@ejemplo.cl</a></p>"
+        },
+        {
+          "id": 9101,
+          "name": "Programa del ramo",
+          "modname": "resource",
+          "uservisible": true,
+          "contents": [
+            {
+              "type": "file",
+              "filename": "programa.pdf",
+              "filepath": "/",
+              "filesize": 11,
+              "fileurl": "https://moodle.ejemplo.cl/webservice/pluginfile.php/1/mod_resource/content/1/programa.pdf?forcedownload=1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Unidad 1: Muestreo",
+      "section": 1,
+      "summary": "",
+      "modules": [
+        {
+          "id": 9201,
+          "name": "Guías",
+          "modname": "folder",
+          "uservisible": true,
+          "contents": [
+            {
+              "type": "file",
+              "filename": "guia1.pdf",
+              "filepath": "/",
+              "filesize": 11,
+              "fileurl": "https://moodle.ejemplo.cl/webservice/pluginfile.php/2/mod_folder/content/0/guia1.pdf?forcedownload=1"
+            },
+            {
+              "type": "file",
+              "filename": "../../malicioso.sh",
+              "filepath": "/../../",
+              "filesize": 11,
+              "fileurl": "https://moodle.ejemplo.cl/webservice/pluginfile.php/2/mod_folder/content/0/x.sh?forcedownload=1"
+            },
+            {
+              "type": "file",
+              "filename": "robo.pdf",
+              "filepath": "/",
+              "filesize": 11,
+              "fileurl": "https://otro-sitio.ejemplo.com/robo.pdf"
+            }
+          ]
+        },
+        {
+          "id": 9202,
+          "name": "Video clase",
+          "modname": "url",
+          "uservisible": false,
+          "contents": [
+            {
+              "type": "url",
+              "filename": "Video",
+              "fileurl": "https://youtube.com/x"
+            }
+          ]
+        },
+        {
+          "id": 9001,
+          "name": "Tarea 3: Pruebas unitarias",
+          "modname": "assign",
+          "instance": 77,
+          "uservisible": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Unidad vacía",
+      "section": 2,
+      "summary": "",
+      "modules": []
+    }
+  ],
+  "gradereport_overview_get_course_grades": {
+    "grades": [
+      {
+        "courseid": 104,
+        "grade": "72,00"
+      },
+      {
+        "courseid": 101,
+        "grade": "58,50"
+      }
+    ]
+  },
+  "gradereport_user_get_grade_items": {
+    "usergrades": [
+      {
+        "courseid": 101,
+        "userid": 42,
+        "gradeitems": [
+          {
+            "itemname": "Certamen 1",
+            "itemtype": "mod",
+            "gradeformatted": "55,00",
+            "rangeformatted": "0–100",
+            "percentageformatted": "55,00 %",
+            "weightformatted": "30,00 %",
+            "feedback": "<p>Revisar pregunta 2</p>"
+          },
+          {
+            "itemname": "Nota oculta",
+            "itemtype": "mod",
+            "gradeishidden": true,
+            "gradeformatted": "-"
+          },
+          {
+            "itemname": null,
+            "itemtype": "course",
+            "gradeformatted": "58,50",
+            "rangeformatted": "0–100",
+            "percentageformatted": "58,50 %",
+            "feedback": ""
+          }
+        ]
+      }
+    ]
+  },
+  "mod_forum_get_forums_by_courses": [
+    {
+      "id": 501,
+      "course": 101,
+      "type": "general",
+      "name": "Foro de consultas"
+    },
+    {
+      "id": 500,
+      "course": 101,
+      "type": "news",
+      "name": "Avisos"
+    }
+  ],
+  "mod_forum_get_forum_discussions": {
+    "500": {
+      "discussions": [
+        {
+          "id": 7001,
+          "discussion": 801,
+          "subject": "Cambio de sala",
+          "userfullname": "Profesora Uno",
+          "timemodified": 1790000300,
+          "numreplies": 0,
+          "message": "<p>El certamen será en la sala <b>A-210</b>.</p>"
+        }
+      ]
+    },
+    "501": {
+      "discussions": [
+        {
+          "id": 7002,
+          "discussion": 802,
+          "subject": "Duda tarea 3",
+          "userfullname": "Estudiante Dos",
+          "timemodified": 1790000100,
+          "numreplies": 2,
+          "message": "¿Se puede usar numpy?"
+        }
+      ]
+    }
+  },
+  "mod_forum_get_discussion_posts": {
+    "posts": [
+      {
+        "id": 2,
+        "subject": "Re: Duda tarea 3",
+        "message": "<p>Sí, se puede.</p>",
+        "timecreated": 1790000200,
+        "author": {
+          "fullname": "Ayudante Tres"
+        },
+        "attachments": []
+      },
+      {
+        "id": 1,
+        "subject": "Duda tarea 3",
+        "message": "¿Se puede usar numpy?",
+        "timecreated": 1790000100,
+        "author": {
+          "fullname": "Estudiante Dos"
+        },
+        "attachments": [
+          {
+            "filename": "codigo.py"
+          }
+        ]
+      }
+    ]
+  },
+  "core_enrol_get_enrolled_users": [
+    {
+      "id": 1,
+      "fullname": "Profesora Uno",
+      "email": "profesora.uno@ejemplo.cl",
+      "roles": [
+        {
+          "roleid": 3,
+          "name": "",
+          "shortname": "editingteacher"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "fullname": "Ayudante Tres",
+      "roles": [
+        {
+          "roleid": 9,
+          "name": "Ayudante",
+          "shortname": "ayudante"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "fullname": "Estudiante Prueba",
+      "email": "yo@ejemplo.cl",
+      "roles": [
+        {
+          "roleid": 5,
+          "name": "",
+          "shortname": "student"
+        }
+      ]
+    }
+  ],
+  "core_course_get_courses_by_field": {
+    "courses": [
+      {
+        "id": 101,
+        "contacts": [
+          {
+            "id": 1,
+            "fullname": "Profesora Uno"
+          }
+        ]
+      }
+    ]
+  },
+  "core_user_get_users_by_field": [
+    {
+      "id": 1,
+      "fullname": "Profesora Uno",
+      "email": "profesora.uno@ejemplo.cl"
+    }
+  ],
+  "mod_assign_get_assignments": {
+    "courses": [
+      {
+        "id": 101,
+        "assignments": [
+          {
+            "id": 77,
+            "cmid": 9001,
+            "course": 101,
+            "name": "Tarea 3: Pruebas unitarias",
+            "intro": "",
+            "introformat": 1,
+            "introattachments": [
+              {
+                "filename": "t3+enunciado.pdf",
+                "filepath": "/",
+                "filesize": 2048,
+                "fileurl": "https://moodle.ejemplo.cl/webservice/pluginfile.php/3/mod_assign/introattachment/0/t3%2Benunciado.pdf"
+              }
+            ],
+            "allowsubmissionsfromdate": 1790000000,
+            "duedate": "__AHORA_MAS_3_DIAS__",
+            "cutoffdate": 0,
+            "configs": [
+              {
+                "plugin": "file",
+                "subtype": "assignsubmission",
+                "name": "enabled",
+                "value": "1"
+              },
+              {
+                "plugin": "file",
+                "subtype": "assignsubmission",
+                "name": "maxfilesubmissions",
+                "value": "20"
+              },
+              {
+                "plugin": "file",
+                "subtype": "assignsubmission",
+                "name": "maxsubmissionsizebytes",
+                "value": "52428800"
+              },
+              {
+                "plugin": "file",
+                "subtype": "assignsubmission",
+                "name": "filetypeslist",
+                "value": ""
+              },
+              {
+                "plugin": "onlinetext",
+                "subtype": "assignsubmission",
+                "name": "enabled",
+                "value": "0"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "warnings": []
+  },
+  "mod_assign_get_submission_status": {
+    "lastattempt": {
+      "submission": {
+        "id": 5,
+        "status": "new",
+        "timemodified": 1790000000,
+        "plugins": [
+          {
+            "type": "file",
+            "name": "Archivos",
+            "fileareas": [
+              {
+                "area": "submission_files",
+                "files": []
+              }
+            ]
+          },
+          {
+            "type": "comments",
+            "name": "Comentarios"
+          }
+        ]
+      },
+      "submissionsenabled": true,
+      "locked": false,
+      "graded": false,
+      "canedit": true,
+      "cansubmit": false,
+      "extensionduedate": null,
+      "gradingstatus": "notgraded"
+    },
+    "warnings": []
+  }
+}
