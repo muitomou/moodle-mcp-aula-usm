@@ -10,6 +10,9 @@ usa [versionado semántico](https://semver.org/lang/es/).
 ### Añadido
 
 - GIF de demostración en el README.
+- Instalación en un solo comando con `uv tool install` (o `pipx`) directo desde GitHub, sin
+  clonar el repositorio.
+- Instrucciones para Windows y tests en macOS y Windows en CI.
 
 ## [0.1.0] - 2026-11-20
 

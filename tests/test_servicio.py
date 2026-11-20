@@ -365,7 +365,10 @@ def test_descarga_no_sigue_enlaces_fuera_de_la_carpeta(aula, universidad, tmp_pa
     afuera.mkdir()
     aula_dir = universidad / "Pruebas de Software" / "Aula"
     aula_dir.mkdir()
-    (aula_dir / "General").symlink_to(afuera, target_is_directory=True)
+    try:
+        (aula_dir / "General").symlink_to(afuera, target_is_directory=True)
+    except OSError:
+        pytest.skip("este sistema no permite crear enlaces simbólicos")
     with pytest.raises(ErrorAula, match="No encontré archivos"):
         correr(aula.descargar_material("INF331", buscar="programa"))
     assert list(afuera.iterdir()) == []

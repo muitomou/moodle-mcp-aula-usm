@@ -59,14 +59,36 @@ Claude / cliente MCP ──MCP (stdio)──▶ aula-mcp ──HTTPS + token─�
 
 ## Instalación
 
-Requiere Python 3.10 o superior.
+La forma más simple es con [uv](https://docs.astral.sh/uv/), que instala `aula-mcp` con
+todo lo que necesita (incluido Python, si no lo tienes) y deja sus comandos disponibles en
+la terminal. No hace falta clonar el repositorio.
+
+**1. Instala uv** (una sola vez):
+
+En macOS o Linux:
 
 ```bash
-git clone https://github.com/muitomou/moodle-mcp-aula-usm.git
-cd moodle-mcp-aula-usm
-python3 -m venv .venv
-.venv/bin/pip install -e .
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+En Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**2. Instala aula-mcp:**
+
+```bash
+uv tool install git+https://github.com/muitomou/moodle-mcp-aula-usm
+```
+
+Si después la terminal no encuentra `aula-mcp-login`, ejecuta `uv tool update-shell` y abre
+una terminal nueva. Para actualizar a la última versión: `uv tool upgrade aula-mcp`.
+
+Si prefieres [pipx](https://pipx.pypa.io) (requiere Python 3.10 o superior), también sirve:
+`pipx install git+https://github.com/muitomou/moodle-mcp-aula-usm`. Para instalar desde el
+código, ve a [Desarrollo](#desarrollo).
 
 ## Obtener el token
 
@@ -74,16 +96,19 @@ Aula USM usa inicio de sesión con Microsoft, así que no hay usuario y contrase
 programa pueda usar. En su lugar se usa el mismo flujo que la app móvil oficial:
 
 ```bash
-.venv/bin/aula-mcp-login --dir-base ~/Escritorio/UNIVERSIDAD
+aula-mcp-login --dir-base ~/Escritorio/UNIVERSIDAD
 ```
 
+`--dir-base` es opcional: es la carpeta donde tienes una subcarpeta por ramo, para que las
+descargas queden ordenadas (ver [Carpetas por ramo](#carpetas-por-ramo)).
+
 1. Se abre Aula en tu navegador. **Antes de iniciar sesión**, abre las herramientas de
-   desarrollo (F12) en la pestaña *Consola*.
+   desarrollo (F12; en Mac, Cmd + Option + I) en la pestaña *Consola*.
 2. Inicia sesión normalmente.
 3. Moodle intenta abrir la app y la consola muestra
    `Failed to launch 'moodlemobile://token=…'`. Copia esa URL completa.
 4. Pégala en la terminal. El programa verifica la firma, prueba el token y lo guarda en
-   `~/.config/aula-mcp/config.env` con permisos `600`.
+   `~/.config/aula-mcp/config.env` (en macOS y Linux, con permisos `600`).
 
 Si ya tienes un token (por ejemplo, en *Preferencias → Claves de seguridad*), usa
 `aula-mcp-login --token`.
@@ -91,7 +116,7 @@ Si ya tienes un token (por ejemplo, en *Preferencias → Claves de seguridad*), 
 Para comprobar que todo funciona:
 
 ```bash
-.venv/bin/aula-mcp-check
+aula-mcp-check
 ```
 
 ## Conectarlo a Claude
@@ -99,13 +124,13 @@ Para comprobar que todo funciona:
 **Claude Code**
 
 ```bash
-claude mcp add --scope user aula -- "$PWD/.venv/bin/aula-mcp"
+claude mcp add --scope user aula -- aula-mcp
 ```
 
 **Claude Desktop**: cierra la app por completo, incluso desde la bandeja del sistema, y ejecuta:
 
 ```bash
-.venv/bin/aula-mcp-desktop
+aula-mcp-desktop
 ```
 
 Este comando agrega el servidor a `claude_desktop_config.json` y respalda el archivo antes.
@@ -120,10 +145,12 @@ conector remoto propio (HTTP + OAuth) está en la hoja de ruta.
 ## Otros clientes
 
 `aula-mcp` es un servidor MCP estándar que se comunica por stdio, así que funciona con
-cualquier cliente que acepte servidores MCP locales. En los ejemplos, reemplaza
-`/ruta/a/moodle-mcp-aula-usm` por la carpeta donde clonaste el repositorio (`echo "$PWD"`).
-El token y la configuración se leen de `~/.config/aula-mcp/config.env`, así que no hace
-falta repetirlos en cada cliente.
+cualquier cliente que acepte servidores MCP locales. Las aplicaciones de escritorio no
+siempre ven los mismos comandos que tu terminal, así que conviene usar la ruta completa:
+obtenla con `which aula-mcp` (macOS y Linux) o `where.exe aula-mcp` (Windows) y ponla en
+lugar de `/ruta/a/aula-mcp` en los ejemplos. En Windows, escribe la ruta con `/` o con `\\`
+dentro del JSON. El token y la configuración se leen de `~/.config/aula-mcp/config.env`,
+así que no hace falta repetirlos en cada cliente.
 
 **Cursor**: en `~/.cursor/mcp.json` (global) o `.cursor/mcp.json` (solo un proyecto):
 
@@ -131,7 +158,7 @@ falta repetirlos en cada cliente.
 {
   "mcpServers": {
     "aula": {
-      "command": "/ruta/a/moodle-mcp-aula-usm/.venv/bin/aula-mcp"
+      "command": "/ruta/a/aula-mcp"
     }
   }
 }
@@ -146,7 +173,7 @@ modo *Agent* en el chat de Copilot:
   "servers": {
     "aula": {
       "type": "stdio",
-      "command": "/ruta/a/moodle-mcp-aula-usm/.venv/bin/aula-mcp"
+      "command": "/ruta/a/aula-mcp"
     }
   }
 }
@@ -158,7 +185,7 @@ modo *Agent* en el chat de Copilot:
 {
   "mcpServers": {
     "aula": {
-      "command": "/ruta/a/moodle-mcp-aula-usm/.venv/bin/aula-mcp"
+      "command": "/ruta/a/aula-mcp"
     }
   }
 }
@@ -221,11 +248,21 @@ Para que un ramo dado de baja no aparezca entre los vigentes, ocúltalo en Aula
 
 ## Desarrollo
 
+Para trabajar en el código, clónalo e instálalo en un entorno virtual (requiere Python 3.10 o
+superior):
+
 ```bash
+git clone https://github.com/muitomou/moodle-mcp-aula-usm.git
+cd moodle-mcp-aula-usm
+python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest --cov
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
+
+En Windows, los comandos del entorno quedan en `.venv\Scripts\` en vez de `.venv/bin/`.
+Instalado así, `aula-mcp` y los demás comandos viven dentro de `.venv`: usa esas rutas al
+configurar Claude u otros clientes.
 
 Los tests usan un Moodle falso, con respuestas en `tests/fixtures/` que siguen el formato de
 la API real de Aula USM. No necesitan red ni token. La especificación está en
@@ -246,6 +283,7 @@ mobile-app web service (no scraping), works with SSO/Microsoft logins via the mo
 flow, keeps responses compact to save tokens, and is read-only towards Moodle. Built for
 Aula USM (Universidad Técnica Federico Santa María, Chile) but usable with any Moodle that
 enables the mobile web service.
+Install it with `uv tool install git+https://github.com/muitomou/moodle-mcp-aula-usm`.
 
 ## Cambios
 
