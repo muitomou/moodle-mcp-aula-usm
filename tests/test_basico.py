@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import os
 
 import httpx
 import pytest
@@ -48,10 +49,12 @@ def test_config_guarda_con_permisos_600(tmp_path, monkeypatch):
     monkeypatch.delenv("AULA_TOKEN", raising=False)
     monkeypatch.delenv("AULA_URL", raising=False)
     archivo = guardar_valor("AULA_TOKEN", "abc")
-    guardar_valor("AULA_DIR_BASE", "/tmp/x")
-    assert oct(archivo.stat().st_mode & 0o777) == "0o600"
+    guardar_valor("AULA_DIR_BASE", str(tmp_path / "x"))
+    if os.name != "nt":  # Windows no tiene permisos de tipo Unix
+        assert oct(archivo.stat().st_mode & 0o777) == "0o600"
     cfg = Config.cargar()
-    assert cfg.token == "abc" and cfg.url == "https://aula.usm.cl" and str(cfg.dir_base) == "/tmp/x"
+    assert cfg.token == "abc" and cfg.url == "https://aula.usm.cl"
+    assert cfg.dir_base == tmp_path / "x"
     monkeypatch.setenv("AULA_TOKEN", "del-entorno")
     assert Config.cargar().token == "del-entorno"
 
