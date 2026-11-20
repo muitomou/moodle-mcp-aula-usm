@@ -305,3 +305,16 @@ def test_url_que_redirige_no_parece_token_invalido():
     cliente = MoodleClient("http://moodle.ejemplo.cl", "tok", transport=httpx.MockTransport(sitio))
     with pytest.raises(MoodleError, match="redirige a https://moodle.ejemplo.cl. Corrige AULA_URL"):
         correr(cliente.llamar("core_webservice_get_site_info"))
+
+
+@pytest.mark.parametrize("paginas", ["5", "4-", "3-2"])
+def test_extraer_texto_paginas_fuera_de_rango(tmp_path, paginas):
+    from aula_mcp import lectura
+
+    from .conftest import pdf_minimo
+
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(pdf_minimo(["uno", "dos", "tres"]))
+    assert lectura.extraer_texto(pdf, paginas) == {
+        "error": "El archivo tiene 3 páginas; pide un rango entre 1 y 3."
+    }

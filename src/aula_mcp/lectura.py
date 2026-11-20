@@ -26,7 +26,10 @@ def _rango(paginas: str | None, total: int) -> list[int]:
         raise ValueError("Formato de páginas inválido; usa '3', '2-5' o '4-'.")
     ini = max(1, int(m.group(1)))
     fin = int(m.group(2)) if m.group(2) else (total if "-" in paginas else ini)
-    return list(range(ini - 1, min(fin, total)))
+    indices = list(range(ini - 1, min(fin, total)))
+    if not indices and total:
+        raise ValueError(f"El archivo tiene {total} páginas; pide un rango entre 1 y {total}.")
+    return indices
 
 
 def _recortar(texto: str, salida: dict[str, Any]) -> None:
