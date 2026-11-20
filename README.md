@@ -226,12 +226,13 @@ Para que un ramo dado de baja no aparezca entre los vigentes, ocúltalo en Aula
 
 ```bash
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest
+.venv/bin/pytest --cov
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
 Los tests usan un Moodle falso, con respuestas en `tests/fixtures/` que siguen el formato de
 la API real de Aula USM. No necesitan red ni token. La especificación está en
-[SPEC.md](SPEC.md).
+[SPEC.md](SPEC.md) y la guía para contribuir, en [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Hoja de ruta
 
