@@ -18,6 +18,15 @@ que tenga habilitado el servicio de la app móvil oficial (`moodle_mobile_app`).
 
 > Proyecto personal y no oficial: no está afiliado a la USM ni a Moodle HQ.
 
+## Demo
+
+<!--
+  Pendiente: grabar el GIF, guardarlo en docs/demo.gif y descomentar la línea de abajo.
+  Antes de subirlo, revisar que no se vean notas, nombres, correos ni el token.
+
+  ![Claude respondiendo «¿Qué tengo que entregar esta semana?» con aula-mcp](docs/demo.gif)
+-->
+
 ## Qué puede hacer
 
 | Herramienta | Para qué |
@@ -239,6 +248,10 @@ mobile-app web service (no scraping), works with SSO/Microsoft logins via the mo
 flow, keeps responses compact to save tokens, and is read-only towards Moodle. Built for
 Aula USM (Universidad Técnica Federico Santa María, Chile) but usable with any Moodle that
 enables the mobile web service.
+
+## Cambios
+
+Ver [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 
