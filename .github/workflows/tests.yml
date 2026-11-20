@@ -32,4 +32,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest -q
+      - name: pytest con cobertura
+        run: pytest -q --cov --cov-report=term-missing
+      - name: resumen de cobertura
+        if: matrix.python-version == '3.13'
+        run: |
+          echo "## Cobertura" >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
