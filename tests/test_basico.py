@@ -260,3 +260,35 @@ def test_sitio_en_mantencion():
     )
     with pytest.raises(MoodleError, match="mantención"):
         correr(cliente.llamar("core_webservice_get_site_info"))
+
+
+@pytest.mark.parametrize("estado", [200, 403])
+def test_descarga_detecta_error_json_de_pluginfile(tmp_path, estado):
+    # webservice/pluginfile.php responde los errores como {"error", "errorcode"}, sin "exception".
+    error = {"error": "Token no válido", "errorcode": "invalidtoken", "stacktrace": None}
+    cliente = MoodleClient(
+        URL,
+        "tok",
+        transport=httpx.MockTransport(lambda r: httpx.Response(estado, json=error)),
+    )
+    with pytest.raises(TokenInvalido):
+        correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_descarga_de_un_json_legitimo(tmp_path):
+    datos = {"error": 0.1, "valores": [1, 2]}  # un .json del ramo que no es un error de Moodle
+    cliente = MoodleClient(
+        URL, "tok", transport=httpx.MockTransport(lambda r: httpx.Response(200, json=datos))
+    )
+    destino = tmp_path / "datos.json"
+    correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/datos.json", destino))
+    assert destino.exists()
+
+
+def test_descarga_http_error_sin_json(tmp_path):
+    cliente = MoodleClient(
+        URL, "tok", transport=httpx.MockTransport(lambda r: httpx.Response(404, text="<html>"))
+    )
+    with pytest.raises(MoodleError, match="HTTP 404 al descargar a.pdf"):
+        correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))

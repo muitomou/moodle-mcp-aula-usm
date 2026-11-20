@@ -119,10 +119,19 @@ class MoodleClient:
 
     @staticmethod
     def _revisar_error(respuesta: Any, funcion: str) -> None:
-        if not (isinstance(respuesta, dict) and "exception" in respuesta):
+        """Lanza MoodleError si `respuesta` es un error de Moodle.
+
+        Reconoce el formato de la API REST ({"exception", "errorcode", "message"}) y el de los
+        scripts AJAX como webservice/pluginfile.php ({"error", "errorcode"}).
+        """
+        if not isinstance(respuesta, dict):
+            return
+        if "exception" not in respuesta and not ("error" in respuesta and "errorcode" in respuesta):
             return
         codigo = respuesta.get("errorcode")
-        mensaje = respuesta.get("message") or codigo or "error desconocido"
+        mensaje = (
+            respuesta.get("message") or respuesta.get("error") or codigo or "error desconocido"
+        )
         if codigo == "invalidtoken":
             raise TokenInvalido(
                 "El token no es válido o expiró. Ejecuta `aula-mcp-login` para renovarlo.", codigo
@@ -138,6 +147,12 @@ class MoodleClient:
         if codigo == "sitemaintenance":
             raise MoodleError("El sitio está en mantención. Intenta de nuevo más tarde.", codigo)
         raise MoodleError(f"Moodle rechazó {funcion}: {mensaje} ({codigo})", codigo)
+
+    def _revisar_json(self, contenido: bytes, funcion: str) -> None:
+        if len(contenido) > 4096:
+            return
+        with contextlib.suppress(ValueError):
+            self._revisar_error(json.loads(contenido), funcion)
 
     def es_url_propia(self, url: str) -> bool:
         partes = urlsplit(url)
@@ -158,6 +173,8 @@ class MoodleClient:
                 "GET", url_archivo, params={"token": self._exigir_token()}
             ) as r:
                 if r.status_code != 200:
+                    # Moodle suele explicar el motivo (p. ej. token inválido) en un JSON.
+                    self._revisar_json(await r.aread(), f"descargar {destino.name}")
                     raise MoodleError(f"HTTP {r.status_code} al descargar {destino.name}.")
                 tipo = r.headers.get("content-type", "")
                 with open(temporal, "wb") as f:
@@ -165,8 +182,7 @@ class MoodleClient:
                         f.write(bloque)
                         escritos += len(bloque)
             if tipo.startswith("application/json") and escritos < 4096:
-                with contextlib.suppress(ValueError):
-                    self._revisar_error(json.loads(temporal.read_bytes()), "descarga")
+                self._revisar_json(temporal.read_bytes(), f"descargar {destino.name}")
             os.replace(temporal, destino)
         except httpx.HTTPError as e:
             raise self._error_de_red(e, f"descargar {destino.name}") from e
