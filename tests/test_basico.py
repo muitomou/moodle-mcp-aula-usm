@@ -292,3 +292,16 @@ def test_descarga_http_error_sin_json(tmp_path):
     )
     with pytest.raises(MoodleError, match="HTTP 404 al descargar a.pdf"):
         correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))
+
+
+def test_url_que_redirige_no_parece_token_invalido():
+    # http:// → https:// con 301: httpx haría un GET sin el token y Moodle diría "token inválido".
+    def sitio(request):
+        if request.url.scheme == "http":
+            nueva = str(request.url.copy_with(scheme="https"))
+            return httpx.Response(301, headers={"location": nueva})
+        return httpx.Response(200, json={"exception": "x", "errorcode": "invalidtoken"})
+
+    cliente = MoodleClient("http://moodle.ejemplo.cl", "tok", transport=httpx.MockTransport(sitio))
+    with pytest.raises(MoodleError, match="redirige a https://moodle.ejemplo.cl. Corrige AULA_URL"):
+        correr(cliente.llamar("core_webservice_get_site_info"))

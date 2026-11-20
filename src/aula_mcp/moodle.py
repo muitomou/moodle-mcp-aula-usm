@@ -8,7 +8,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -32,6 +32,7 @@ class TokenInvalido(MoodleError):
 # 30 s para leer (Moodle puede tardar en armar respuestas grandes), pero solo 10 s para conectar:
 # si no hay red, conviene saberlo pronto.
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+_RUTA_REST = "/webservice/rest/server.php"
 
 
 def aplanar(valor: Any, prefijo: str = "") -> dict[str, str]:
@@ -87,9 +88,19 @@ class MoodleClient:
             **aplanar(params),
         }
         try:
-            r = await self._http.post(f"{self.url}/webservice/rest/server.php", data=datos)
+            # Sin seguir redirecciones: httpx convertiría el POST en un GET sin el token y Moodle
+            # respondería "token inválido", que confunde (pasa con AULA_URL=http://… o sin www).
+            r = await self._http.post(f"{self.url}{_RUTA_REST}", data=datos, follow_redirects=False)
         except httpx.HTTPError as e:
             raise self._error_de_red(e, f"consultar {funcion}") from e
+        if r.is_redirect:
+            nueva = urljoin(str(r.request.url), r.headers.get("location", ""))
+            nueva = nueva.split("?")[0].removesuffix(_RUTA_REST)
+            raise MoodleError(
+                f"{self.url} redirige a {nueva}. Corrige AULA_URL (en config.env o en el "
+                f"entorno) a {nueva} y vuelve a intentarlo.",
+                "redireccion",
+            )
         if r.status_code != 200:
             raise MoodleError(f"Moodle respondió HTTP {r.status_code} en {funcion}.")
         try:
