@@ -9,7 +9,7 @@ from typing import Any
 
 from .carpetas import CarpetaNoResuelta, Carpetas, claves_sigla, elegir, puntaje_abreviatura
 from .lectura import extraer_texto
-from .moodle import MoodleClient, MoodleError
+from .moodle import MoodleClient, MoodleError, TokenInvalido
 from .util import (
     compactar,
     fecha,
@@ -100,6 +100,8 @@ class Aula:
                 offset=0,
             )
             return {c["id"] for c in r.get("courses", [])}
+        except TokenInvalido:
+            raise  # sin token no sirve el respaldo: el usuario debe renovarlo
         except MoodleError:
             # Respaldo: sin fecha de término o con término futuro.
             ahora = time.time()
@@ -151,9 +153,13 @@ class Aula:
             solo_vigentes = [c for c in candidatos if c["id"] in vigentes]
             if len(solo_vigentes) == 1:
                 return solo_vigentes[0]
-            opciones = "; ".join(f"{c['id']}: {nombre_ramo(c)}" for c in (solo_vigentes or candidatos))
+            opciones = "; ".join(
+                f"{c['id']}: {nombre_ramo(c)}" for c in (solo_vigentes or candidatos)
+            )
             raise ErrorAula(f"«{texto}» coincide con varios ramos. Usa el id. Opciones: {opciones}")
-        raise ErrorAula(f"No encontré el ramo «{texto}». Usa listar_ramos para ver los disponibles.")
+        raise ErrorAula(
+            f"No encontré el ramo «{texto}». Usa listar_ramos para ver los disponibles."
+        )
 
     # --- herramientas ---------------------------------------------------
     async def listar_ramos(self, incluir_pasados: bool = False) -> dict[str, Any]:
@@ -215,18 +221,28 @@ class Aula:
         return {"desde": fecha(desde), "hasta": fecha(ahora + dias * 86400), "entregas": eventos}
 
     async def _contenidos(self, ramo_id: int) -> list[dict[str, Any]]:
-        return await self._cacheado(f"contenido:{ramo_id}", "core_course_get_contents", courseid=ramo_id)
+        return await self._cacheado(
+            f"contenido:{ramo_id}", "core_course_get_contents", courseid=ramo_id
+        )
 
     async def _tareas(self, ramo_id: int) -> dict[int, dict[str, Any]]:
         """Tareas del ramo por cmid. Traen enunciado y adjuntos, que core_course_get_contents omite."""
-        r = await self._cacheado(f"tareas:{ramo_id}", "mod_assign_get_assignments", courseids=[ramo_id])
-        return {t["cmid"]: t for curso in r.get("courses", []) for t in curso.get("assignments", [])}
+        r = await self._cacheado(
+            f"tareas:{ramo_id}", "mod_assign_get_assignments", courseids=[ramo_id]
+        )
+        return {
+            t["cmid"]: t for curso in r.get("courses", []) for t in curso.get("assignments", [])
+        }
 
-    async def _tareas_si_hay(self, ramo_id: int, secciones: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    async def _tareas_si_hay(
+        self, ramo_id: int, secciones: list[dict[str, Any]]
+    ) -> dict[int, dict[str, Any]]:
         if not any(m.get("modname") == "assign" for s in secciones for m in s.get("modules", [])):
             return {}
         try:
             return await self._tareas(ramo_id)
+        except TokenInvalido:
+            raise
         except MoodleError:
             return {}
 
@@ -258,7 +274,11 @@ class Aula:
             resumen = limpiar_html(s.get("summary"), 300)
             if recursos or resumen:
                 secciones.append(
-                    {"seccion": s.get("name") or f"Sección {s.get('section')}", "resumen": resumen or None, "recursos": recursos}
+                    {
+                        "seccion": s.get("name") or f"Sección {s.get('section')}",
+                        "resumen": resumen or None,
+                        "recursos": recursos,
+                    }
                 )
         return {"ramo": nombre_ramo(c), "ramo_id": c["id"], "secciones": secciones}
 
@@ -276,12 +296,20 @@ class Aula:
                 if recurso_id is not None and m.get("id") != recurso_id:
                     continue
                 for a in _archivos_modulo(m, tareas):
-                    if consulta and consulta not in normalizar(f"{m.get('name', '')} {a.get('filename', '')}"):
+                    if consulta and consulta not in normalizar(
+                        f"{m.get('name', '')} {a.get('filename', '')}"
+                    ):
                         continue
-                    subruta = [sanear_nombre(p, 80) for p in PurePosixPath(a.get("filepath") or "/").parts if p != "/"]
+                    subruta = [
+                        sanear_nombre(p, 80)
+                        for p in PurePosixPath(a.get("filepath") or "/").parts
+                        if p != "/"
+                    ]
                     if m.get("modname") in ("folder", "assign"):
                         subruta.insert(0, sanear_nombre(m.get("name") or "carpeta", 80))
-                    destino = raiz.joinpath(nombre_seccion, *subruta, sanear_nombre(a.get("filename") or "archivo"))
+                    destino = raiz.joinpath(
+                        nombre_seccion, *subruta, sanear_nombre(a.get("filename") or "archivo")
+                    )
                     # Defensa extra: el destino debe quedar dentro de la carpeta del ramo.
                     if not destino.resolve().is_relative_to(raiz.resolve()):
                         continue
@@ -297,7 +325,9 @@ class Aula:
     ) -> dict[str, Any]:
         """Descarga (si hace falta) un archivo del ramo y devuelve su texto."""
         if recurso_id is None and not archivo:
-            raise ErrorAula("Indica recurso_id (de contenido_ramo o ver_tarea) o parte del nombre en `archivo`.")
+            raise ErrorAula(
+                "Indica recurso_id (de contenido_ramo o ver_tarea) o parte del nombre en `archivo`."
+            )
         c = await self.resolver_ramo(ramo)
         try:
             carpeta, _ = self.carpetas.resolver(c)
@@ -307,7 +337,9 @@ class Aula:
             raiz = self.cache_dir / str(c["id"])
         candidatos = await self._archivos_ramo(c, raiz, recurso_id, archivo)
         if not candidatos:
-            raise ErrorAula("No encontré ese archivo. Revisa los nombres con contenido_ramo o ver_tarea.")
+            raise ErrorAula(
+                "No encontré ese archivo. Revisa los nombres con contenido_ramo o ver_tarea."
+            )
         if len(candidatos) > 1:
             nombres = ", ".join(a.get("filename") or "?" for _, a in candidatos[:15])
             raise ErrorAula(f"Hay {len(candidatos)} archivos; indica cuál con `archivo`: {nombres}")
@@ -348,12 +380,19 @@ class Aula:
             if destino.exists() and not sobrescribir:
                 igual = destino.stat().st_size == a.get("filesize")
                 omitidos.append(
-                    {"archivo": str(destino), "motivo": "ya existe" if igual else "ya existe con otro tamaño (usa sobrescribir=true)"}
+                    {
+                        "archivo": str(destino),
+                        "motivo": "ya existe"
+                        if igual
+                        else "ya existe con otro tamaño (usa sobrescribir=true)",
+                    }
                 )
                 continue
             try:
                 n = await self.cliente.descargar(a["fileurl"], destino)
                 guardados.append({"archivo": str(destino), "tamano": tamano(n)})
+            except TokenInvalido:
+                raise
             except MoodleError as e:
                 errores.append({"archivo": a.get("filename"), "error": str(e)})
         salida: dict[str, Any] = {
@@ -364,14 +403,18 @@ class Aula:
             "errores": errores,
         }
         if recien:
-            salida["aviso"] = f"Vinculé automáticamente el ramo a {carpeta}. Cámbialo con vincular_carpeta si no es correcta."
+            salida["aviso"] = (
+                f"Vinculé automáticamente el ramo a {carpeta}. Cámbialo con vincular_carpeta si no es correcta."
+            )
         return salida
 
     async def ver_tarea(self, tarea_id: int, ramo: str | None = None) -> dict[str, Any]:
         """Enunciado, adjuntos, fechas, formato de entrega y estado de una tarea (por su id de recurso)."""
-        ramos = [await self.resolver_ramo(ramo)] if ramo else [
-            c for c in await self.ramos() if c["id"] in await self.ids_vigentes()
-        ]
+        ramos = (
+            [await self.resolver_ramo(ramo)]
+            if ramo
+            else [c for c in await self.ramos() if c["id"] in await self.ids_vigentes()]
+        )
         tarea, curso = None, None
         for c in ramos:
             tarea = (await self._tareas(c["id"])).get(int(tarea_id))
@@ -380,21 +423,37 @@ class Aula:
                 break
         if not tarea:
             donde = f"en {nombre_ramo(ramos[0])}" if ramo else "en tus ramos vigentes"
-            raise ErrorAula(f"No encontré una tarea con id {tarea_id} {donde}. Si es de un ramo pasado, indica `ramo`.")
+            raise ErrorAula(
+                f"No encontré una tarea con id {tarea_id} {donde}. Si es de un ramo pasado, indica `ramo`."
+            )
 
-        config = {(x.get("plugin"), x.get("subtype"), x.get("name")): x.get("value") for x in tarea.get("configs", [])}
+        config = {
+            (x.get("plugin"), x.get("subtype"), x.get("name")): x.get("value")
+            for x in tarea.get("configs", [])
+        }
         formatos = []
         if config.get(("file", "assignsubmission", "enabled")) == "1":
             maximo = int(config.get(("file", "assignsubmission", "maxsubmissionsizebytes")) or 0)
-            formatos.append({
-                "tipo": "archivos",
-                "max_archivos": int(config.get(("file", "assignsubmission", "maxfilesubmissions")) or 0) or None,
-                "tamano_maximo": tamano(maximo) if maximo else "límite del sitio",
-                "tipos_permitidos": config.get(("file", "assignsubmission", "filetypeslist")) or "cualquiera",
-            })
+            formatos.append(
+                {
+                    "tipo": "archivos",
+                    "max_archivos": int(
+                        config.get(("file", "assignsubmission", "maxfilesubmissions")) or 0
+                    )
+                    or None,
+                    "tamano_maximo": tamano(maximo) if maximo else "límite del sitio",
+                    "tipos_permitidos": config.get(("file", "assignsubmission", "filetypeslist"))
+                    or "cualquiera",
+                }
+            )
         if config.get(("onlinetext", "assignsubmission", "enabled")) == "1":
             limite = config.get(("onlinetext", "assignsubmission", "wordlimit"))
-            formatos.append({"tipo": "texto en línea", "limite_palabras": int(limite) if limite and limite != "0" else None})
+            formatos.append(
+                {
+                    "tipo": "texto en línea",
+                    "limite_palabras": int(limite) if limite and limite != "0" else None,
+                }
+            )
 
         salida: dict[str, Any] = {
             "tarea": tarea.get("name"),
@@ -417,7 +476,11 @@ class Aula:
             )
 
         try:
-            estado = await self.cliente.llamar("mod_assign_get_submission_status", assignid=tarea["id"])
+            estado = await self.cliente.llamar(
+                "mod_assign_get_submission_status", assignid=tarea["id"]
+            )
+        except TokenInvalido:
+            raise
         except MoodleError as e:
             salida["mi_entrega"] = {"error": str(e)}
             return salida
@@ -430,13 +493,22 @@ class Aula:
             for f in area.get("files") or []
         ]
         texto = next(
-            (limpiar_html(ed.get("text"), 500) for plugin in envio.get("plugins") or []
-             if plugin.get("type") == "onlinetext" for ed in plugin.get("editorfields") or [] if ed.get("text")),
+            (
+                limpiar_html(ed.get("text"), 500)
+                for plugin in envio.get("plugins") or []
+                if plugin.get("type") == "onlinetext"
+                for ed in plugin.get("editorfields") or []
+                if ed.get("text")
+            ),
             None,
         )
         mi_entrega: dict[str, Any] = {
-            "estado": _ESTADOS_ENTREGA.get(envio.get("status"), envio.get("status") or "sin entregar"),
-            "ultima_modificacion": fecha(envio.get("timemodified")) if envio.get("status") not in (None, "new") else None,
+            "estado": _ESTADOS_ENTREGA.get(
+                envio.get("status"), envio.get("status") or "sin entregar"
+            ),
+            "ultima_modificacion": fecha(envio.get("timemodified"))
+            if envio.get("status") not in (None, "new")
+            else None,
             "archivos_entregados": entregados,
             "puede_editar": ultimo.get("canedit"),
             "calificada": ultimo.get("graded"),
@@ -477,7 +549,9 @@ class Aula:
             return {"notas_finales": notas}
         c = await self.resolver_ramo(ramo)
         usuario = (await self.sitio())["userid"]
-        r = await self.cliente.llamar("gradereport_user_get_grade_items", courseid=c["id"], userid=usuario)
+        r = await self.cliente.llamar(
+            "gradereport_user_get_grade_items", courseid=c["id"], userid=usuario
+        )
         items = []
         for ug in r.get("usergrades", []):
             for it in ug.get("gradeitems", []):
@@ -537,7 +611,9 @@ class Aula:
             d.pop("_orden")
         return {
             "ramo": nombre_ramo(c),
-            "foros": [{"id": f.get("id"), "nombre": f.get("name"), "tipo": f.get("type")} for f in foros],
+            "foros": [
+                {"id": f.get("id"), "nombre": f.get("name"), "tipo": f.get("type")} for f in foros
+            ],
             "discusiones": discusiones[:limite],
         }
 
@@ -568,6 +644,8 @@ class Aula:
                 courseid=c["id"],
                 options=[{"name": "userfields", "value": "id,fullname,email,roles"}],
             )
+        except TokenInvalido:
+            raise
         except MoodleError:
             usuarios = []
         for u in usuarios:
@@ -577,15 +655,24 @@ class Aula:
             personas.append(
                 {
                     "nombre": u.get("fullname"),
-                    "rol": ", ".join(r.get("name") or _ROLES.get(r.get("shortname"), r.get("shortname")) for r in roles),
+                    "rol": ", ".join(
+                        r.get("name") or _ROLES.get(r.get("shortname"), r.get("shortname"))
+                        for r in roles
+                    ),
                     "correo": u.get("email") or "no visible",
                 }
             )
         if not personas:
             try:
-                r = await self.cliente.llamar("core_course_get_courses_by_field", field="id", value=c["id"])
+                r = await self.cliente.llamar(
+                    "core_course_get_courses_by_field", field="id", value=c["id"]
+                )
                 for x in (r.get("courses") or [{}])[0].get("contacts", []):
-                    personas.append({"nombre": x.get("fullname"), "rol": "Profesor/a", "correo": "no visible"})
+                    personas.append(
+                        {"nombre": x.get("fullname"), "rol": "Profesor/a", "correo": "no visible"}
+                    )
+            except TokenInvalido:
+                raise
             except MoodleError:
                 pass
 
@@ -594,13 +681,18 @@ class Aula:
         textos = [c.get("summary") or ""]
         for s in await self._contenidos(c["id"]):
             textos.append(s.get("summary") or "")
-            textos.extend((m.get("description") or "") + " " + (m.get("name") or "") for m in s.get("modules", []))
+            textos.extend(
+                (m.get("description") or "") + " " + (m.get("name") or "")
+                for m in s.get("modules", [])
+            )
         for t in textos:
             plano = limpiar_html(t)
             for m in _CORREO.finditer(plano):
                 correo = m.group(0).rstrip(".").lower()
                 if correo not in mencionados:
-                    contexto = plano[max(0, m.start() - 80): m.end() + 20].replace("\n", " ").strip()
+                    contexto = (
+                        plano[max(0, m.start() - 80) : m.end() + 20].replace("\n", " ").strip()
+                    )
                     mencionados[correo] = contexto
         salida: dict[str, Any] = {
             "ramo": nombre_ramo(c),

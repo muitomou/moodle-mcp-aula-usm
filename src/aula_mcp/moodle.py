@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -26,6 +27,12 @@ class MoodleError(Exception):
 
 class TokenInvalido(MoodleError):
     pass
+
+
+# 30 s para leer (Moodle puede tardar en armar respuestas grandes), pero solo 10 s para conectar:
+# si no hay red, conviene saberlo pronto.
+TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+_RUTA_REST = "/webservice/rest/server.php"
 
 
 def aplanar(valor: Any, prefijo: str = "") -> dict[str, str]:
@@ -51,7 +58,7 @@ class MoodleClient:
         token: str | None,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
-        timeout: float = 30.0,
+        timeout: float | httpx.Timeout = TIMEOUT,
     ):
         self.url = url.rstrip("/")
         self.token = token
@@ -81,9 +88,19 @@ class MoodleClient:
             **aplanar(params),
         }
         try:
-            r = await self._http.post(f"{self.url}/webservice/rest/server.php", data=datos)
+            # Sin seguir redirecciones: httpx convertiría el POST en un GET sin el token y Moodle
+            # respondería "token inválido", que confunde (pasa con AULA_URL=http://… o sin www).
+            r = await self._http.post(f"{self.url}{_RUTA_REST}", data=datos, follow_redirects=False)
         except httpx.HTTPError as e:
-            raise MoodleError(f"No se pudo conectar con {self.url}: {e.__class__.__name__}") from e
+            raise self._error_de_red(e, f"consultar {funcion}") from e
+        if r.is_redirect:
+            nueva = urljoin(str(r.request.url), r.headers.get("location", ""))
+            nueva = nueva.split("?")[0].removesuffix(_RUTA_REST)
+            raise MoodleError(
+                f"{self.url} redirige a {nueva}. Corrige AULA_URL (en config.env o en el "
+                f"entorno) a {nueva} y vuelve a intentarlo.",
+                "redireccion",
+            )
         if r.status_code != 200:
             raise MoodleError(f"Moodle respondió HTTP {r.status_code} en {funcion}.")
         try:
@@ -93,17 +110,60 @@ class MoodleClient:
         self._revisar_error(respuesta, funcion)
         return respuesta
 
+    def _error_de_red(self, e: httpx.HTTPError, accion: str) -> MoodleError:
+        """Traduce un error de httpx a un mensaje que el usuario pueda entender."""
+        if isinstance(e, httpx.TimeoutException):
+            return MoodleError(
+                f"{self.url} no respondió a tiempo al {accion}. El sitio puede estar lento o "
+                "caído; intenta de nuevo en unos minutos.",
+                "timeout",
+            )
+        if isinstance(e, httpx.ConnectError):
+            return MoodleError(
+                f"No se pudo conectar con {self.url} al {accion}. Revisa tu conexión a internet "
+                "y la URL configurada en AULA_URL.",
+                "sinconexion",
+            )
+        return MoodleError(
+            f"Error de red con {self.url} al {accion} ({e.__class__.__name__}).", "red"
+        )
+
     @staticmethod
     def _revisar_error(respuesta: Any, funcion: str) -> None:
-        if not (isinstance(respuesta, dict) and "exception" in respuesta):
+        """Lanza MoodleError si `respuesta` es un error de Moodle.
+
+        Reconoce el formato de la API REST ({"exception", "errorcode", "message"}) y el de los
+        scripts AJAX como webservice/pluginfile.php ({"error", "errorcode"}).
+        """
+        if not isinstance(respuesta, dict):
+            return
+        if "exception" not in respuesta and not ("error" in respuesta and "errorcode" in respuesta):
             return
         codigo = respuesta.get("errorcode")
-        mensaje = respuesta.get("message") or codigo or "error desconocido"
+        mensaje = (
+            respuesta.get("message") or respuesta.get("error") or codigo or "error desconocido"
+        )
         if codigo == "invalidtoken":
             raise TokenInvalido(
                 "El token no es válido o expiró. Ejecuta `aula-mcp-login` para renovarlo.", codigo
             )
+        if codigo == "accessexception":
+            # Moodle responde así a un token vencido (validuntil), pero también a una función que
+            # el servicio no permite; por eso no es TokenInvalido.
+            raise MoodleError(
+                f"Moodle denegó el acceso a {funcion}. Si todas las consultas fallan igual, el "
+                "token probablemente expiró: renuévalo con `aula-mcp-login`.",
+                codigo,
+            )
+        if codigo == "sitemaintenance":
+            raise MoodleError("El sitio está en mantención. Intenta de nuevo más tarde.", codigo)
         raise MoodleError(f"Moodle rechazó {funcion}: {mensaje} ({codigo})", codigo)
+
+    def _revisar_json(self, contenido: bytes, funcion: str) -> None:
+        if len(contenido) > 4096:
+            return
+        with contextlib.suppress(ValueError):
+            self._revisar_error(json.loads(contenido), funcion)
 
     def es_url_propia(self, url: str) -> bool:
         partes = urlsplit(url)
@@ -116,14 +176,16 @@ class MoodleClient:
         """
         if not self.es_url_propia(url_archivo):
             raise MoodleError(f"URL de archivo fuera de {self.url}; no se envía el token.")
-        destino.parent.mkdir(parents=True, exist_ok=True)
         temporal = destino.with_name(destino.name + ".parcial")
         escritos = 0
         try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
             async with self._http.stream(
                 "GET", url_archivo, params={"token": self._exigir_token()}
             ) as r:
                 if r.status_code != 200:
+                    # Moodle suele explicar el motivo (p. ej. token inválido) en un JSON.
+                    self._revisar_json(await r.aread(), f"descargar {destino.name}")
                     raise MoodleError(f"HTTP {r.status_code} al descargar {destino.name}.")
                 tipo = r.headers.get("content-type", "")
                 with open(temporal, "wb") as f:
@@ -131,14 +193,18 @@ class MoodleClient:
                         f.write(bloque)
                         escritos += len(bloque)
             if tipo.startswith("application/json") and escritos < 4096:
-                try:
-                    self._revisar_error(json.loads(temporal.read_bytes()), "descarga")
-                except ValueError:
-                    pass
+                self._revisar_json(temporal.read_bytes(), f"descargar {destino.name}")
             os.replace(temporal, destino)
         except httpx.HTTPError as e:
-            raise MoodleError(f"Falló la descarga de {destino.name}: {e.__class__.__name__}") from e
+            raise self._error_de_red(e, f"descargar {destino.name}") from e
+        except OSError as e:
+            # Carpeta sin permisos, disco lleno, una ruta ocupada por un archivo, etc.
+            raise MoodleError(
+                f"No se pudo guardar {destino.name} en {destino.parent}: "
+                f"{e.strerror or e.__class__.__name__}.",
+                "disco",
+            ) from e
         finally:
-            if temporal.exists():
-                temporal.unlink()
+            with contextlib.suppress(OSError):
+                temporal.unlink(missing_ok=True)
         return escritos

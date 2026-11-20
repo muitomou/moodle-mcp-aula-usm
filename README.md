@@ -5,7 +5,7 @@
 ![licencia](https://img.shields.io/badge/licencia-MIT-green)
 
 Servidor [MCP (Model Context Protocol)](https://modelcontextprotocol.io) que le da a Claude
-acceso a tu Moodle **como estudiante**: ramos, próximas entregas, enunciados de tareas,
+u otros asistentes compatibles con MCP acceso a tu Moodle **como estudiante**: ramos, próximas entregas, enunciados de tareas,
 materiales, notas, avisos y foros. Así puedes preguntarle cosas como:
 
 > «¿Qué tengo que entregar esta semana?»
@@ -17,6 +17,15 @@ Está pensado para **Aula USM** (`https://aula.usm.cl`), pero funciona con cualq
 que tenga habilitado el servicio de la app móvil oficial (`moodle_mobile_app`).
 
 > Proyecto personal y no oficial: no está afiliado a la USM ni a Moodle HQ.
+
+## Demo
+
+<!--
+  Pendiente: grabar el GIF, guardarlo en docs/demo.gif y descomentar la línea de abajo.
+  Antes de subirlo, revisar que no se vean notas, nombres, correos ni el token.
+
+  ![Claude respondiendo «¿Qué tengo que entregar esta semana?» con aula-mcp](docs/demo.gif)
+-->
 
 ## Qué puede hacer
 
@@ -39,7 +48,7 @@ descargas y el archivo que vincula ramos con carpetas.
 ## Cómo funciona
 
 ```
-Claude (Code / Desktop) ──MCP (stdio)──▶ aula-mcp ──HTTPS + token──▶ API REST de Moodle
+Claude / cliente MCP ──MCP (stdio)──▶ aula-mcp ──HTTPS + token──▶ API REST de Moodle
                                             │
                                             └──▶ ~/UNIVERSIDAD/<ramo>/Aula/…   (descargas)
 ```
@@ -111,6 +120,57 @@ carpetas. Con *Remote Control* de Claude Code puedes seguir desde la app de Clau
 celular una sesión que corre en tu computador, y esa sesión tiene acceso al MCP. Un
 conector remoto propio (HTTP + OAuth) está en la hoja de ruta.
 
+## Otros clientes
+
+`aula-mcp` es un servidor MCP estándar que se comunica por stdio, así que funciona con
+cualquier cliente que acepte servidores MCP locales. En los ejemplos, reemplaza
+`/ruta/a/moodle-mcp-aula-usm` por la carpeta donde clonaste el repositorio (`echo "$PWD"`).
+El token y la configuración se leen de `~/.config/aula-mcp/config.env`, así que no hace
+falta repetirlos en cada cliente.
+
+**Cursor**: en `~/.cursor/mcp.json` (global) o `.cursor/mcp.json` (solo un proyecto):
+
+```json
+{
+  "mcpServers": {
+    "aula": {
+      "command": "/ruta/a/moodle-mcp-aula-usm/.venv/bin/aula-mcp"
+    }
+  }
+}
+```
+
+**VS Code (GitHub Copilot en modo agente)**: en `.vscode/mcp.json` del espacio de trabajo, o
+en la configuración de usuario con el comando *MCP: Open User Configuration*. Luego elige el
+modo *Agent* en el chat de Copilot:
+
+```json
+{
+  "servers": {
+    "aula": {
+      "type": "stdio",
+      "command": "/ruta/a/moodle-mcp-aula-usm/.venv/bin/aula-mcp"
+    }
+  }
+}
+```
+
+**Gemini CLI**: en `~/.gemini/settings.json` (global) o `.gemini/settings.json` (proyecto):
+
+```json
+{
+  "mcpServers": {
+    "aula": {
+      "command": "/ruta/a/moodle-mcp-aula-usm/.venv/bin/aula-mcp"
+    }
+  }
+}
+```
+
+**ChatGPT**: la app de ChatGPT solo acepta conectores remotos por HTTP, no servidores locales
+por stdio, así que por ahora no se puede conectar. El conector remoto está en la
+[hoja de ruta](#hoja-de-ruta).
+
 ## Configuración
 
 | Variable | Por defecto | Uso |
@@ -166,17 +226,18 @@ Para que un ramo dado de baja no aparezca entre los vigentes, ocúltalo en Aula
 
 ```bash
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest
+.venv/bin/pytest --cov
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
 Los tests usan un Moodle falso, con respuestas en `tests/fixtures/` que siguen el formato de
 la API real de Aula USM. No necesitan red ni token. La especificación está en
-[SPEC.md](SPEC.md).
+[SPEC.md](SPEC.md) y la guía para contribuir, en [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Hoja de ruta
 
 - [ ] Subir entregas (`mod_assign_save_submission`), siempre con confirmación explícita
-- [ ] Conector remoto (HTTP + OAuth) para usarlo como conector en la app de Claude
+- [ ] Conector remoto (HTTP + OAuth) para usarlo como conector en la app de Claude y en ChatGPT
 - [ ] Publicar en PyPI (`pipx install aula-mcp`)
 
 ## English summary
@@ -188,6 +249,10 @@ mobile-app web service (no scraping), works with SSO/Microsoft logins via the mo
 flow, keeps responses compact to save tokens, and is read-only towards Moodle. Built for
 Aula USM (Universidad Técnica Federico Santa María, Chile) but usable with any Moodle that
 enables the mobile web service.
+
+## Cambios
+
+Ver [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

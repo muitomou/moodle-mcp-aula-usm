@@ -18,7 +18,9 @@ from aula_mcp.servicio import Aula
 
 URL = "https://moodle.ejemplo.cl"
 TOKEN = "token-de-prueba"
-FIXTURES = json.loads((Path(__file__).parent / "fixtures" / "moodle.json").read_text(encoding="utf-8"))
+FIXTURES = json.loads(
+    (Path(__file__).parent / "fixtures" / "moodle.json").read_text(encoding="utf-8")
+)
 
 
 def _con_fechas(valor):
@@ -44,12 +46,26 @@ class FakeMoodle:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if "/webservice/pluginfile.php/" in request.url.path:
             self.descargas.append(request)
-            return httpx.Response(200, content=self.contenido_descarga, headers={"content-type": "application/pdf"})
+            if request.url.params.get("token") != TOKEN:
+                # Formato AJAX de pluginfile.php, distinto al de la API REST.
+                return httpx.Response(
+                    200, json={"error": "Token no válido", "errorcode": "invalidtoken"}
+                )
+            return httpx.Response(
+                200, content=self.contenido_descarga, headers={"content-type": "application/pdf"}
+            )
         datos = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
         funcion = datos["wsfunction"]
         self.llamadas.append((funcion, datos))
         if datos.get("wstoken") != TOKEN:
-            return httpx.Response(200, json={"exception": "moodle_exception", "errorcode": "invalidtoken", "message": "Token no válido"})
+            return httpx.Response(
+                200,
+                json={
+                    "exception": "moodle_exception",
+                    "errorcode": "invalidtoken",
+                    "message": "Token no válido",
+                },
+            )
         if funcion in self.fallar:
             return httpx.Response(200, json=self.fallar[funcion])
         r = self.respuestas[funcion]
@@ -75,7 +91,16 @@ def cliente(moodle) -> MoodleClient:
 def universidad(tmp_path) -> Path:
     """Estructura parecida a ~/Escritorio/UNIVERSIDAD."""
     base = tmp_path / "UNIVERSIDAD"
-    for nombre in ["pds", "Pruebas de Software", "seminariosisges", "bioinf", "IA", "Certificaciones", "2025-2/DIU", "2025-2/SISGES"]:
+    for nombre in [
+        "pds",
+        "Pruebas de Software",
+        "seminariosisges",
+        "bioinf",
+        "IA",
+        "Certificaciones",
+        "2025-2/DIU",
+        "2025-2/SISGES",
+    ]:
         (base / nombre).mkdir(parents=True)
     return base
 
@@ -92,8 +117,10 @@ def pdf_minimo(paginas: list[str]) -> bytes:
     objetos.append(f"<< /Type /Pages /Kids [{kids}] /Count {len(paginas)} >>")
     fuente = 3 + 2 * len(paginas)
     for i, texto in enumerate(paginas):
-        objetos.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Contents {4 + 2 * i} 0 R "
-                       f"/Resources << /Font << /F1 {fuente} 0 R >> >> >>")
+        objetos.append(
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Contents {4 + 2 * i} 0 R "
+            f"/Resources << /Font << /F1 {fuente} 0 R >> >> >>"
+        )
         flujo = f"BT /F1 12 Tf 20 100 Td ({texto}) Tj ET"
         objetos.append(f"<< /Length {len(flujo)} >>\nstream\n{flujo}\nendstream")
     objetos.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
@@ -105,7 +132,9 @@ def pdf_minimo(paginas: list[str]) -> bytes:
     xref = len(salida)
     salida += f"xref\n0 {len(objetos) + 1}\n0000000000 65535 f \n".encode()
     salida += "".join(f"{o:010d} 00000 n \n" for o in offsets).encode()
-    salida += f"trailer\n<< /Size {len(objetos) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    salida += (
+        f"trailer\n<< /Size {len(objetos) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    )
     return salida
 
 

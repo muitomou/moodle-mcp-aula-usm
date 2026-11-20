@@ -1,0 +1,53 @@
+name: Reportar un error
+description: Algo no funciona como debería.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportarlo. **No pegues tu token, tu `config.env` ni datos personales**
+        (notas, correos, nombres): si un mensaje los incluye, reemplázalos por `***`.
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: Qué pasó
+      description: Qué hiciste, qué esperabas y qué ocurrió en cambio.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Le pedí a Claude: «¿Qué tengo que entregar esta semana?»
+        2. Se llamó a proximas_entregas
+        3. Respondió: …
+  - type: textarea
+    id: error
+    attributes:
+      label: Mensaje de error
+      description: El texto del error o la salida de `aula-mcp-check`, sin datos personales.
+      render: text
+  - type: dropdown
+    id: cliente
+    attributes:
+      label: Cliente MCP
+      options:
+        - Claude Code
+        - Claude Desktop
+        - Cursor
+        - VS Code (Copilot)
+        - Gemini CLI
+        - Otro
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      description: Salida de `pip show aula-mcp` (línea Version) o el commit que usas.
+  - type: input
+    id: entorno
+    attributes:
+      label: Sistema y Moodle
+      placeholder: "Ubuntu 24.04, Python 3.12, Aula USM"

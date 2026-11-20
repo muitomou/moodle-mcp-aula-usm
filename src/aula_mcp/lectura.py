@@ -8,11 +8,13 @@ from typing import Any
 
 # ~30 000 caracteres ≈ 8-9 mil tokens: suficiente para un enunciado sin inundar el contexto.
 MAX_CARACTERES = 30_000
+# fmt: off
 _TEXTO = {
     ".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".yaml", ".yml", ".tex", ".bib", ".html", ".htm",
     ".py", ".ipynb", ".c", ".h", ".cpp", ".hpp", ".java", ".js", ".ts", ".sql", ".r", ".m", ".sh",
     ".fasta", ".fa", ".fastq", ".gb", ".pdb",
 }
+# fmt: on
 
 
 def _rango(paginas: str | None, total: int) -> list[int]:
@@ -24,7 +26,10 @@ def _rango(paginas: str | None, total: int) -> list[int]:
         raise ValueError("Formato de páginas inválido; usa '3', '2-5' o '4-'.")
     ini = max(1, int(m.group(1)))
     fin = int(m.group(2)) if m.group(2) else (total if "-" in paginas else ini)
-    return list(range(ini - 1, min(fin, total)))
+    indices = list(range(ini - 1, min(fin, total)))
+    if not indices and total:
+        raise ValueError(f"El archivo tiene {total} páginas; pide un rango entre 1 y {total}.")
+    return indices
 
 
 def _recortar(texto: str, salida: dict[str, Any]) -> None:
@@ -48,7 +53,9 @@ def extraer_texto(ruta: Path, paginas: str | None = None) -> dict[str, Any]:
         except ValueError as e:
             return {"error": str(e)}
         except Exception as e:  # PDF dañado o cifrado
-            return {"error": f"No pude leer el PDF ({e.__class__.__name__}). Ábrelo desde guardado_en."}
+            return {
+                "error": f"No pude leer el PDF ({e.__class__.__name__}). Ábrelo desde guardado_en."
+            }
         partes, leidas = [], []
         largo = 0
         for i in indices:
@@ -75,4 +82,6 @@ def extraer_texto(ruta: Path, paginas: str | None = None) -> dict[str, Any]:
     if ext in _TEXTO:
         _recortar(ruta.read_text(encoding="utf-8", errors="replace"), salida)
         return salida
-    return {"aviso": f"No extraigo texto de archivos {ext or 'sin extensión'}; quedó guardado en guardado_en."}
+    return {
+        "aviso": f"No extraigo texto de archivos {ext or 'sin extensión'}; quedó guardado en guardado_en."
+    }

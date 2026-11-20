@@ -53,7 +53,7 @@ class Config:
     directorio: Path
 
     @classmethod
-    def cargar(cls) -> "Config":
+    def cargar(cls) -> Config:
         directorio = directorio_config()
         archivo = leer_env(directorio / "config.env")
 

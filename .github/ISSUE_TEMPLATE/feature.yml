@@ -1,0 +1,24 @@
+name: Proponer una mejora
+description: Una herramienta nueva, un cambio de comportamiento o soporte para otro Moodle.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué necesitas
+      description: El problema o la tarea que quieres resolver, más que la solución.
+      placeholder: "Quiero preguntarle a Claude por las fechas de los certámenes, pero…"
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Cómo te imaginas que funcione. Si conoces la función de la API de Moodle que haría falta, menciónala.
+  - type: checkboxes
+    id: alcance
+    attributes:
+      label: Alcance
+      options:
+        - label: Solo lee datos de Moodle (no envía ni modifica nada)
+        - label: Me gustaría implementarlo yo

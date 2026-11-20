@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,9 @@ _SIN_COINCIDENCIA = -(10**6)
 PUNTAJE_NOMBRE_EXACTO = 100
 PUNTAJE_SIGLA = 90
 MARGEN_AUTOMATICO = 4  # diferencia mínima con el 2.º candidato para elegir sin preguntar
-MINIMO_AUTOMATICO = 6  # 'IA' para «Introducción a la …» (3) no basta; para «Inteligencia Artificial» (8) sí
+# Puntaje mínimo para elegir sola: 'IA' para «Introducción a la …» (3) no basta;
+# para «Inteligencia Artificial» (8) sí.
+MINIMO_AUTOMATICO = 6
 
 
 class CarpetaNoResuelta(Exception):
@@ -46,7 +48,7 @@ def puntaje_abreviatura(clave: str, nombre: str) -> int:
     """
     palabras = tuple(palabras_ramo(nombre))
 
-    @lru_cache(maxsize=None)
+    @cache
     def mejor(i: int, j: int) -> int:
         if i == len(clave):
             return 0
@@ -54,7 +56,11 @@ def puntaje_abreviatura(clave: str, nombre: str) -> int:
         for k in range(j, len(palabras)):
             palabra, vacia = palabras[k]
             largo = 0
-            while largo < len(palabra) and i + largo < len(clave) and palabra[largo] == clave[i + largo]:
+            while (
+                largo < len(palabra)
+                and i + largo < len(clave)
+                and palabra[largo] == clave[i + largo]
+            ):
                 largo += 1
                 resto = mejor(i + largo, k + 1)
                 if resto > _SIN_COINCIDENCIA:
@@ -129,7 +135,9 @@ class Carpetas:
             carpeta = self.dir_base / carpeta
         carpeta = carpeta.resolve()
         if not carpeta.is_dir():
-            raise CarpetaNoResuelta(f"La carpeta {carpeta} no existe (no se crean carpetas solas).", [])
+            raise CarpetaNoResuelta(
+                f"La carpeta {carpeta} no existe (no se crean carpetas solas).", []
+            )
         datos = self._leer()
         datos[str(ramo["id"])] = {
             "carpeta": str(carpeta),
@@ -148,7 +156,9 @@ class Carpetas:
                 continue
             if _SEMESTRE.match(p.name):
                 # Semestres pasados: buscar un nivel más adentro.
-                salida.extend(q for q in sorted(p.iterdir()) if q.is_dir() and not q.name.startswith("."))
+                salida.extend(
+                    q for q in sorted(p.iterdir()) if q.is_dir() and not q.name.startswith(".")
+                )
             else:
                 salida.append(p)
         return salida

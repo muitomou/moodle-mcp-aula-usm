@@ -67,9 +67,15 @@ def test_aplanar():
 
 
 def test_token_invalido():
-    cliente = MoodleClient(URL, "malo", transport=httpx.MockTransport(
-        lambda r: httpx.Response(200, json={"exception": "x", "errorcode": "invalidtoken", "message": "m"})
-    ))
+    cliente = MoodleClient(
+        URL,
+        "malo",
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(
+                200, json={"exception": "x", "errorcode": "invalidtoken", "message": "m"}
+            )
+        ),
+    )
     with pytest.raises(TokenInvalido, match="aula-mcp-login"):
         correr(cliente.llamar("core_webservice_get_site_info"))
 
@@ -94,7 +100,9 @@ def test_nombres_usm():
     assert limpiar_nombre_ramo(completo) == "INTRODUCCIÓN A LA BIOINFORMÁTICA"
     assert paralelos_ramo(completo) == "1/200"
     assert sigla_ramo({"fullname": completo}) == "INF466"
-    assert sigla_ramo({"fullname": "Sin sigla", "shortname": "202602_J1_C7_INF331_3732"}) == "INF331"
+    assert (
+        sigla_ramo({"fullname": "Sin sigla", "shortname": "202602_J1_C7_INF331_3732"}) == "INF331"
+    )
     assert sigla_ramo({"fullname": "Otra", "shortname": "ELO-314-2026"}) == "ELO314"
     assert limpiar_nombre_ramo("Nombre normal") == "Nombre normal"
 
@@ -148,17 +156,27 @@ def test_elegir():
 # --- login ----------------------------------------------------------------
 def _url_lanzamiento(sitio, passport, token="TOK123", privado="PRIV"):
     firma = hashlib.md5(f"{sitio}{passport}".encode()).hexdigest()
-    return "moodlemobile://token=" + base64.b64encode(f"{firma}:::{token}:::{privado}".encode()).decode()
+    return (
+        "moodlemobile://token="
+        + base64.b64encode(f"{firma}:::{token}:::{privado}".encode()).decode()
+    )
 
 
 def test_decodificar_lanzamiento():
     pegado = _url_lanzamiento("https://aula.usm.cl", "777")
-    assert decodificar_lanzamiento(f"  Failed to launch '{pegado}' because…", "https://aula.usm.cl/", "777") == "TOK123"
+    assert (
+        decodificar_lanzamiento(
+            f"  Failed to launch '{pegado}' because…", "https://aula.usm.cl/", "777"
+        )
+        == "TOK123"
+    )
 
 
 def test_decodificar_lanzamiento_rechaza_otra_firma():
     with pytest.raises(ValueError, match="firma"):
-        decodificar_lanzamiento(_url_lanzamiento("https://aula.usm.cl", "111"), "https://aula.usm.cl", "222")
+        decodificar_lanzamiento(
+            _url_lanzamiento("https://aula.usm.cl", "111"), "https://aula.usm.cl", "222"
+        )
     with pytest.raises(ValueError):
         decodificar_lanzamiento("cualquier cosa", "https://aula.usm.cl", "1")
 
@@ -166,6 +184,7 @@ def test_decodificar_lanzamiento_rechaza_otra_firma():
 # --- lectura ----------------------------------------------------------------
 def test_extraer_texto_pdf_y_rangos(tmp_path):
     from aula_mcp import lectura
+
     from .conftest import pdf_minimo
 
     pdf = tmp_path / "x.pdf"
@@ -186,3 +205,116 @@ def test_extraer_texto_trunca(tmp_path, monkeypatch):
     (tmp_path / "a.txt").write_text("x" * 50)
     r = lectura.extraer_texto(tmp_path / "a.txt")
     assert r["truncado"] and len(r["texto"]) == 10
+
+
+@pytest.mark.parametrize(
+    "error, mensaje",
+    [
+        (httpx.ReadTimeout, "no respondió a tiempo"),
+        (httpx.ConnectTimeout, "no respondió a tiempo"),
+        (httpx.ConnectError, "Revisa tu conexión a internet"),
+        (httpx.RemoteProtocolError, r"Error de red .* \(RemoteProtocolError\)"),
+    ],
+)
+def test_errores_de_red_con_mensaje_claro(tmp_path, error, mensaje):
+    def falla(request):
+        raise error("detalle interno", request=request)
+
+    cliente = MoodleClient(URL, "tok", transport=httpx.MockTransport(falla))
+    with pytest.raises(MoodleError, match=mensaje) as e:
+        correr(cliente.llamar("core_webservice_get_site_info"))
+    assert "core_webservice_get_site_info" in str(e.value)
+    with pytest.raises(MoodleError, match=mensaje):
+        correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))
+    assert list(tmp_path.iterdir()) == []  # no deja archivos a medias
+
+
+def test_timeout_por_defecto():
+    cliente = MoodleClient(URL, "tok")
+    assert cliente._http.timeout.connect == 10.0 and cliente._http.timeout.read == 30.0
+
+
+def _cliente_que_responde(respuesta):
+    return MoodleClient(
+        URL, "tok", transport=httpx.MockTransport(lambda r: httpx.Response(200, json=respuesta))
+    )
+
+
+def test_token_vencido_por_accessexception():
+    # Moodle lanza webservice_access_exception (errorcode accessexception) si el token venció.
+    cliente = _cliente_que_responde(
+        {
+            "exception": "webservice_access_exception",
+            "errorcode": "accessexception",
+            "message": "Excepción de control de acceso",
+        }
+    )
+    with pytest.raises(MoodleError, match="aula-mcp-login") as e:
+        correr(cliente.llamar("core_webservice_get_site_info"))
+    assert e.value.codigo == "accessexception" and not isinstance(e.value, TokenInvalido)
+
+
+def test_sitio_en_mantencion():
+    cliente = _cliente_que_responde(
+        {"exception": "moodle_exception", "errorcode": "sitemaintenance", "message": "..."}
+    )
+    with pytest.raises(MoodleError, match="mantención"):
+        correr(cliente.llamar("core_webservice_get_site_info"))
+
+
+@pytest.mark.parametrize("estado", [200, 403])
+def test_descarga_detecta_error_json_de_pluginfile(tmp_path, estado):
+    # webservice/pluginfile.php responde los errores como {"error", "errorcode"}, sin "exception".
+    error = {"error": "Token no válido", "errorcode": "invalidtoken", "stacktrace": None}
+    cliente = MoodleClient(
+        URL,
+        "tok",
+        transport=httpx.MockTransport(lambda r: httpx.Response(estado, json=error)),
+    )
+    with pytest.raises(TokenInvalido):
+        correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_descarga_de_un_json_legitimo(tmp_path):
+    datos = {"error": 0.1, "valores": [1, 2]}  # un .json del ramo que no es un error de Moodle
+    cliente = MoodleClient(
+        URL, "tok", transport=httpx.MockTransport(lambda r: httpx.Response(200, json=datos))
+    )
+    destino = tmp_path / "datos.json"
+    correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/datos.json", destino))
+    assert destino.exists()
+
+
+def test_descarga_http_error_sin_json(tmp_path):
+    cliente = MoodleClient(
+        URL, "tok", transport=httpx.MockTransport(lambda r: httpx.Response(404, text="<html>"))
+    )
+    with pytest.raises(MoodleError, match="HTTP 404 al descargar a.pdf"):
+        correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))
+
+
+def test_url_que_redirige_no_parece_token_invalido():
+    # http:// → https:// con 301: httpx haría un GET sin el token y Moodle diría "token inválido".
+    def sitio(request):
+        if request.url.scheme == "http":
+            nueva = str(request.url.copy_with(scheme="https"))
+            return httpx.Response(301, headers={"location": nueva})
+        return httpx.Response(200, json={"exception": "x", "errorcode": "invalidtoken"})
+
+    cliente = MoodleClient("http://moodle.ejemplo.cl", "tok", transport=httpx.MockTransport(sitio))
+    with pytest.raises(MoodleError, match="redirige a https://moodle.ejemplo.cl. Corrige AULA_URL"):
+        correr(cliente.llamar("core_webservice_get_site_info"))
+
+
+@pytest.mark.parametrize("paginas", ["5", "4-", "3-2"])
+def test_extraer_texto_paginas_fuera_de_rango(tmp_path, paginas):
+    from aula_mcp import lectura
+
+    from .conftest import pdf_minimo
+
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(pdf_minimo(["uno", "dos", "tres"]))
+    assert lectura.extraer_texto(pdf, paginas) == {
+        "error": "El archivo tiene 3 páginas; pide un rango entre 1 y 3."
+    }
