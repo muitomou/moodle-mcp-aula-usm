@@ -5,14 +5,21 @@ build-backend = "hatchling.build"
 [project]
 name = "aula-mcp"
 version = "0.1.0"
-description = "Servidor MCP para consultar Moodle (Aula USM) desde Claude u otros asistentes"
+description = "Servidor MCP para consultar Moodle (Aula USM) desde Claude u otros asistentes compatibles con MCP"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "Mauro" }]
+authors = [{ name = "Mauro Castillo Lackington" }]
 keywords = ["mcp", "moodle", "claude", "usm", "model-context-protocol"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
     "Topic :: Education",
 ]
