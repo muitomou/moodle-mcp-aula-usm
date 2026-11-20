@@ -9,7 +9,7 @@ from typing import Any
 
 from .carpetas import CarpetaNoResuelta, Carpetas, claves_sigla, elegir, puntaje_abreviatura
 from .lectura import extraer_texto
-from .moodle import MoodleClient, MoodleError
+from .moodle import MoodleClient, MoodleError, TokenInvalido
 from .util import (
     compactar,
     fecha,
@@ -100,6 +100,8 @@ class Aula:
                 offset=0,
             )
             return {c["id"] for c in r.get("courses", [])}
+        except TokenInvalido:
+            raise  # sin token no sirve el respaldo: el usuario debe renovarlo
         except MoodleError:
             # Respaldo: sin fecha de término o con término futuro.
             ahora = time.time()
@@ -239,6 +241,8 @@ class Aula:
             return {}
         try:
             return await self._tareas(ramo_id)
+        except TokenInvalido:
+            raise
         except MoodleError:
             return {}
 
@@ -387,6 +391,8 @@ class Aula:
             try:
                 n = await self.cliente.descargar(a["fileurl"], destino)
                 guardados.append({"archivo": str(destino), "tamano": tamano(n)})
+            except TokenInvalido:
+                raise
             except MoodleError as e:
                 errores.append({"archivo": a.get("filename"), "error": str(e)})
         salida: dict[str, Any] = {
@@ -473,6 +479,8 @@ class Aula:
             estado = await self.cliente.llamar(
                 "mod_assign_get_submission_status", assignid=tarea["id"]
             )
+        except TokenInvalido:
+            raise
         except MoodleError as e:
             salida["mi_entrega"] = {"error": str(e)}
             return salida
@@ -636,6 +644,8 @@ class Aula:
                 courseid=c["id"],
                 options=[{"name": "userfields", "value": "id,fullname,email,roles"}],
             )
+        except TokenInvalido:
+            raise
         except MoodleError:
             usuarios = []
         for u in usuarios:
@@ -661,6 +671,8 @@ class Aula:
                     personas.append(
                         {"nombre": x.get("fullname"), "rol": "Profesor/a", "correo": "no visible"}
                     )
+            except TokenInvalido:
+                raise
             except MoodleError:
                 pass
 

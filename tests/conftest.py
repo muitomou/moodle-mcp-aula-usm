@@ -46,6 +46,11 @@ class FakeMoodle:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if "/webservice/pluginfile.php/" in request.url.path:
             self.descargas.append(request)
+            if request.url.params.get("token") != TOKEN:
+                # Formato AJAX de pluginfile.php, distinto al de la API REST.
+                return httpx.Response(
+                    200, json={"error": "Token no válido", "errorcode": "invalidtoken"}
+                )
             return httpx.Response(
                 200, content=self.contenido_descarga, headers={"content-type": "application/pdf"}
             )

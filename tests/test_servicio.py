@@ -4,6 +4,7 @@ import time
 import pytest
 
 from aula_mcp import server
+from aula_mcp.moodle import TokenInvalido
 from aula_mcp.servicio import ErrorAula
 
 from .conftest import TOKEN, correr, pdf_minimo
@@ -472,3 +473,29 @@ def test_contactos_ramo_si_fallan_ambas_fuentes(aula, moodle):
     r = correr(aula.contactos_ramo("pds"))
     assert r["personas"] == []
     assert r["correos_mencionados"][0]["correo"] == "ana.ayudante@ejemplo.cl"
+
+
+# --- token que vence a mitad de la sesión -----------------------------------
+@pytest.fixture
+def aula_con_token_vencido(aula):
+    """Aula con ramos, contenidos y tareas en caché, cuyo token ya no sirve."""
+    correr(aula.contenido_ramo("pds"))
+    aula.cliente.token = "vencido"
+    return aula
+
+
+@pytest.mark.parametrize(
+    "consulta",
+    [
+        lambda a: a.ids_vigentes(),
+        lambda a: a.contactos_ramo("pds"),
+        lambda a: a.ver_tarea(9001, ramo="pds"),
+        lambda a: a.descargar_material("pds", todo=True),
+    ],
+    ids=["ids_vigentes", "contactos_ramo", "ver_tarea", "descargar_material"],
+)
+def test_token_vencido_no_se_oculta_tras_un_respaldo(aula_con_token_vencido, consulta, universidad):
+    with pytest.raises(TokenInvalido, match="aula-mcp-login"):
+        correr(consulta(aula_con_token_vencido))
+    # Tampoco quedan archivos con el JSON de error en vez del PDF.
+    assert not list((universidad / "Pruebas de Software").rglob("*.pdf"))
