@@ -72,7 +72,9 @@ async def listar_ramos(incluir_pasados: bool = False) -> str:
 
 
 @mcp.tool(annotations=LECTURA)
-async def proximas_entregas(dias: int = 14, ramo: str | None = None, incluir_atrasadas: bool = True) -> str:
+async def proximas_entregas(
+    dias: int = 14, ramo: str | None = None, incluir_atrasadas: bool = True
+) -> str:
     """Entregas y actividades pendientes con fecha límite en los próximos `dias` días.
 
     Con incluir_atrasadas también muestra las pendientes vencidas en las últimas 2 semanas.
@@ -160,6 +162,7 @@ async def vincular_carpeta(ramo: str, carpeta: str | None = None) -> str:
     Sin `carpeta`, solo sugiere carpetas candidatas. No crea carpetas.
     """
     if carpeta is None:
+
         async def sugerir() -> dict[str, Any]:
             return {"candidatas": await aula().sugerir_carpetas(ramo)}
 

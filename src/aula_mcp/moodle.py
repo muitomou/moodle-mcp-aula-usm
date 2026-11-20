@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -131,10 +132,8 @@ class MoodleClient:
                         f.write(bloque)
                         escritos += len(bloque)
             if tipo.startswith("application/json") and escritos < 4096:
-                try:
+                with contextlib.suppress(ValueError):
                     self._revisar_error(json.loads(temporal.read_bytes()), "descarga")
-                except ValueError:
-                    pass
             os.replace(temporal, destino)
         except httpx.HTTPError as e:
             raise MoodleError(f"Falló la descarga de {destino.name}: {e.__class__.__name__}") from e

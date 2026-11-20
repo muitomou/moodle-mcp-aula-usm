@@ -67,9 +67,15 @@ def test_aplanar():
 
 
 def test_token_invalido():
-    cliente = MoodleClient(URL, "malo", transport=httpx.MockTransport(
-        lambda r: httpx.Response(200, json={"exception": "x", "errorcode": "invalidtoken", "message": "m"})
-    ))
+    cliente = MoodleClient(
+        URL,
+        "malo",
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(
+                200, json={"exception": "x", "errorcode": "invalidtoken", "message": "m"}
+            )
+        ),
+    )
     with pytest.raises(TokenInvalido, match="aula-mcp-login"):
         correr(cliente.llamar("core_webservice_get_site_info"))
 
@@ -94,7 +100,9 @@ def test_nombres_usm():
     assert limpiar_nombre_ramo(completo) == "INTRODUCCIÓN A LA BIOINFORMÁTICA"
     assert paralelos_ramo(completo) == "1/200"
     assert sigla_ramo({"fullname": completo}) == "INF466"
-    assert sigla_ramo({"fullname": "Sin sigla", "shortname": "202602_J1_C7_INF331_3732"}) == "INF331"
+    assert (
+        sigla_ramo({"fullname": "Sin sigla", "shortname": "202602_J1_C7_INF331_3732"}) == "INF331"
+    )
     assert sigla_ramo({"fullname": "Otra", "shortname": "ELO-314-2026"}) == "ELO314"
     assert limpiar_nombre_ramo("Nombre normal") == "Nombre normal"
 
@@ -148,17 +156,27 @@ def test_elegir():
 # --- login ----------------------------------------------------------------
 def _url_lanzamiento(sitio, passport, token="TOK123", privado="PRIV"):
     firma = hashlib.md5(f"{sitio}{passport}".encode()).hexdigest()
-    return "moodlemobile://token=" + base64.b64encode(f"{firma}:::{token}:::{privado}".encode()).decode()
+    return (
+        "moodlemobile://token="
+        + base64.b64encode(f"{firma}:::{token}:::{privado}".encode()).decode()
+    )
 
 
 def test_decodificar_lanzamiento():
     pegado = _url_lanzamiento("https://aula.usm.cl", "777")
-    assert decodificar_lanzamiento(f"  Failed to launch '{pegado}' because…", "https://aula.usm.cl/", "777") == "TOK123"
+    assert (
+        decodificar_lanzamiento(
+            f"  Failed to launch '{pegado}' because…", "https://aula.usm.cl/", "777"
+        )
+        == "TOK123"
+    )
 
 
 def test_decodificar_lanzamiento_rechaza_otra_firma():
     with pytest.raises(ValueError, match="firma"):
-        decodificar_lanzamiento(_url_lanzamiento("https://aula.usm.cl", "111"), "https://aula.usm.cl", "222")
+        decodificar_lanzamiento(
+            _url_lanzamiento("https://aula.usm.cl", "111"), "https://aula.usm.cl", "222"
+        )
     with pytest.raises(ValueError):
         decodificar_lanzamiento("cualquier cosa", "https://aula.usm.cl", "1")
 
@@ -166,6 +184,7 @@ def test_decodificar_lanzamiento_rechaza_otra_firma():
 # --- lectura ----------------------------------------------------------------
 def test_extraer_texto_pdf_y_rangos(tmp_path):
     from aula_mcp import lectura
+
     from .conftest import pdf_minimo
 
     pdf = tmp_path / "x.pdf"

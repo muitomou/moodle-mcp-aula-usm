@@ -64,4 +64,5 @@ select = [
     "SIM", # simplificaciones
 ]
 # Las líneas largas que quedan son textos para el usuario; el formateador se encarga del resto.
-ignore = ["E501"]
+# SIM108: un if/else de varias líneas se lee mejor que un ternario largo.
+ignore = ["E501", "SIM108"]

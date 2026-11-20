@@ -47,7 +47,9 @@ def decodificar_lanzamiento(texto: str, url_sitio: str, passport: str) -> str:
     codificado = unquote(m.group(1))
     codificado += "=" * (-len(codificado) % 4)
     try:
-        decodificado = base64.b64decode(codificado, altchars=b"-_" if "-" in codificado or "_" in codificado else None).decode()
+        decodificado = base64.b64decode(
+            codificado, altchars=b"-_" if "-" in codificado or "_" in codificado else None
+        ).decode()
     except (ValueError, UnicodeDecodeError) as e:
         raise ValueError("El token pegado no es base64 válido; ¿se copió completo?") from e
     partes = decodificado.split(":::")
@@ -72,9 +74,15 @@ async def _verificar(url: str, token: str) -> dict:
 
 
 def login() -> None:
-    p = argparse.ArgumentParser(prog="aula-mcp-login", description="Obtiene y guarda el token de Moodle.")
-    p.add_argument("--url", help="URL del Moodle (por defecto, la configurada o https://aula.usm.cl)")
-    p.add_argument("--token", action="store_true", help="Pegar un token existente en vez de iniciar sesión")
+    p = argparse.ArgumentParser(
+        prog="aula-mcp-login", description="Obtiene y guarda el token de Moodle."
+    )
+    p.add_argument(
+        "--url", help="URL del Moodle (por defecto, la configurada o https://aula.usm.cl)"
+    )
+    p.add_argument(
+        "--token", action="store_true", help="Pegar un token existente en vez de iniciar sesión"
+    )
     p.add_argument("--dir-base", help="Carpeta con una subcarpeta por ramo (para descargas)")
     p.add_argument("--no-abrir", action="store_true", help="No abrir el navegador automáticamente")
     a = p.parse_args()
@@ -115,9 +123,17 @@ def login() -> None:
 
 def _config_desktop() -> Path:
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Claude"
+            / "claude_desktop_config.json"
+        )
     if sys.platform.startswith("win"):
-        return Path(os.environ.get("APPDATA", Path.home())) / "Claude" / "claude_desktop_config.json"
+        return (
+            Path(os.environ.get("APPDATA", Path.home())) / "Claude" / "claude_desktop_config.json"
+        )
     return Path.home() / ".config" / "Claude" / "claude_desktop_config.json"
 
 
@@ -136,7 +152,9 @@ def desktop() -> None:
     """Registra aula-mcp en Claude Desktop (claude_desktop_config.json)."""
     p = argparse.ArgumentParser(prog="aula-mcp-desktop", description=desktop.__doc__)
     p.add_argument("--nombre", default="aula", help="Nombre del servidor en Claude Desktop")
-    p.add_argument("--forzar", action="store_true", help="Escribir aunque Claude Desktop esté abierto")
+    p.add_argument(
+        "--forzar", action="store_true", help="Escribir aunque Claude Desktop esté abierto"
+    )
     a = p.parse_args()
 
     if _desktop_abierto() and not a.forzar:
@@ -150,8 +168,14 @@ def desktop() -> None:
         respaldo = archivo.with_name(archivo.name + ".respaldo")
         shutil.copy2(archivo, respaldo)
     # El ejecutable junto al intérprete actual (p. ej. .venv/bin/aula-mcp), siempre como ruta absoluta.
-    junto = Path(sys.executable).absolute().parent / ("aula-mcp.exe" if os.name == "nt" else "aula-mcp")
-    comando = str(junto) if junto.exists() else str(Path(shutil.which("aula-mcp") or "aula-mcp").absolute())
+    junto = Path(sys.executable).absolute().parent / (
+        "aula-mcp.exe" if os.name == "nt" else "aula-mcp"
+    )
+    comando = (
+        str(junto)
+        if junto.exists()
+        else str(Path(shutil.which("aula-mcp") or "aula-mcp").absolute())
+    )
     datos.setdefault("mcpServers", {})[a.nombre] = {"command": comando}
     archivo.parent.mkdir(parents=True, exist_ok=True)
     temporal = archivo.with_name(archivo.name + ".tmp")
@@ -174,8 +198,14 @@ def check() -> None:
             print(f"✓ {ramos['usuario']} — {len(ramos['ramos'])} ramos vigentes:")
             for r in ramos["ramos"]:
                 carpeta = r["carpeta_local"] or "sin carpeta vinculada"
-                sugeridas = await aula.sugerir_carpetas(str(r["id"])) if not r["carpeta_local"] else []
-                extra = f" (sugeridas: {', '.join(Path(s).name for s in sugeridas)})" if sugeridas else ""
+                sugeridas = (
+                    await aula.sugerir_carpetas(str(r["id"])) if not r["carpeta_local"] else []
+                )
+                extra = (
+                    f" (sugeridas: {', '.join(Path(s).name for s in sugeridas)})"
+                    if sugeridas
+                    else ""
+                )
                 print(f"  [{r['id']}] {r['sigla'] or '—'} {r['nombre']} → {carpeta}{extra}")
             entregas = await aula.proximas_entregas()
             print(f"✓ {len(entregas['entregas'])} entregas pendientes en las próximas 2 semanas.")
