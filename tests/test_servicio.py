@@ -1,4 +1,5 @@
 import json
+import time
 
 import pytest
 
@@ -317,3 +318,157 @@ def test_leer_material_sin_carpeta_usa_cache(aula, moodle, tmp_path):
         aula.leer_material("105", recurso_id=9101)
     )  # «Introducción a la Programación»: sin carpeta clara
     assert r["guardado_en"].startswith(str(tmp_path / "config" / "cache" / "105"))
+
+
+# --- ramas menos frecuentes de servicio --------------------------------------
+def _tarea(moodle):
+    return moodle.respuestas["mod_assign_get_assignments"]["courses"][0]["assignments"][0]
+
+
+def test_ids_vigentes_respaldo_por_fecha_de_termino(aula, moodle):
+    # Si Moodle no tiene la clasificación por línea de tiempo, se usa la fecha de término.
+    moodle.fallar["core_course_get_enrolled_courses_by_timeline_classification"] = {
+        "exception": "x",
+        "errorcode": "invalidrecord",
+        "message": "no existe",
+    }
+    ahora = int(time.time())
+    fechas = {101: 0, 102: ahora + 86400, 103: ahora - 86400, 104: ahora - 86400, 105: 0}
+    for c in moodle.respuestas["core_enrol_get_users_courses"]:
+        c["enddate"] = fechas[c["id"]]
+    assert correr(aula.ids_vigentes()) == {101, 102, 105}
+
+
+def test_contenido_ramo_sin_tareas_no_pide_tareas(aula, moodle):
+    moodle.respuestas["core_course_get_contents"] = [
+        s for s in moodle.respuestas["core_course_get_contents"] if s["section"] == 0
+    ]
+    correr(aula.contenido_ramo("pds"))
+    assert "mod_assign_get_assignments" not in moodle.funciones()
+
+
+def test_contenido_ramo_si_fallan_las_tareas(aula, moodle):
+    moodle.fallar["mod_assign_get_assignments"] = {
+        "exception": "x",
+        "errorcode": "nopermissions",
+        "message": "sin permiso",
+    }
+    r = correr(aula.contenido_ramo("pds"))
+    tarea = r["secciones"][1]["recursos"][2]
+    assert tarea["tipo"] == "assign" and "vence" not in tarea and "archivos" not in tarea
+
+
+def test_descarga_no_sigue_enlaces_fuera_de_la_carpeta(aula, universidad, tmp_path):
+    # Si una sección local es un enlace simbólico hacia afuera, no se escribe ahí.
+    afuera = tmp_path / "afuera"
+    afuera.mkdir()
+    aula_dir = universidad / "Pruebas de Software" / "Aula"
+    aula_dir.mkdir()
+    (aula_dir / "General").symlink_to(afuera, target_is_directory=True)
+    with pytest.raises(ErrorAula, match="No encontré archivos"):
+        correr(aula.descargar_material("INF331", buscar="programa"))
+    assert list(afuera.iterdir()) == []
+
+
+def test_descargar_material_demasiados_archivos(aula, monkeypatch):
+    from aula_mcp import servicio
+
+    monkeypatch.setattr(servicio, "MAX_ARCHIVOS_SIN_TODO", 2)
+    with pytest.raises(ErrorAula, match="Coinciden 3 archivos"):
+        correr(aula.descargar_material("INF331", recurso_id=9201))
+
+
+def test_leer_material_validaciones(aula):
+    with pytest.raises(ErrorAula, match="recurso_id"):
+        correr(aula.leer_material("pds"))
+    with pytest.raises(ErrorAula, match="No encontré ese archivo"):
+        correr(aula.leer_material("pds", archivo="no-existe"))
+
+
+def test_ver_tarea_con_texto_en_linea_entrega_y_retroalimentacion(aula, moodle):
+    tarea = _tarea(moodle)
+    tarea["intro"] = "<p>Escribe un <b>informe</b>.</p>"
+    tarea["configs"][-1]["value"] = "1"  # onlinetext habilitado
+    tarea["configs"].append(
+        {"plugin": "onlinetext", "subtype": "assignsubmission", "name": "wordlimit", "value": "500"}
+    )
+    moodle.respuestas["mod_assign_get_submission_status"] = {
+        "lastattempt": {
+            "submission": {
+                "status": "submitted",
+                "timemodified": 1790000000,
+                "plugins": [
+                    {
+                        "type": "file",
+                        "fileareas": [{"files": [{"filename": "informe.pdf"}]}],
+                    },
+                    {"type": "onlinetext", "editorfields": [{"text": "<p>Mi respuesta</p>"}]},
+                ],
+            },
+            "canedit": False,
+            "graded": True,
+            "extensionduedate": 1791000000,
+        },
+        "feedback": {
+            "gradefordisplay": "<b>85,00</b> / 100,00",
+            "plugins": [{"editorfields": [{"text": "<p>Muy bien</p>"}, {"text": ""}]}],
+        },
+    }
+    r = correr(aula.ver_tarea(9001))
+    assert r["enunciado"] == "Escribe un informe."
+    assert r["formato_de_entrega"][1] == {"tipo": "texto en línea", "limite_palabras": 500}
+    entrega = r["mi_entrega"]
+    assert entrega["estado"] == "enviada" and entrega["ultima_modificacion"]
+    assert entrega["archivos_entregados"] == ["informe.pdf"]
+    assert entrega["texto_entregado"] == "Mi respuesta"
+    assert entrega["prorroga_hasta"] and entrega["calificada"] is True
+    assert entrega["nota"] == "85,00 / 100,00" and entrega["comentarios"] == ["Muy bien"]
+
+
+def test_ver_tarea_si_falla_el_estado_de_entrega(aula, moodle):
+    moodle.fallar["mod_assign_get_submission_status"] = {
+        "exception": "x",
+        "errorcode": "nopermissions",
+        "message": "sin permiso",
+    }
+    r = correr(aula.ver_tarea(9001, ramo="pds"))
+    assert r["tarea"] == "Tarea 3: Pruebas unitarias"
+    assert "sin permiso" in r["mi_entrega"]["error"]
+
+
+def test_ver_notas_con_categoria(aula, moodle):
+    items = moodle.respuestas["gradereport_user_get_grade_items"]["usergrades"][0]["gradeitems"]
+    items.insert(1, {"itemname": "Certámenes", "itemtype": "category", "gradeformatted": "55,00"})
+    detalle = correr(aula.ver_notas("pds"))
+    assert [i["item"] for i in detalle["items"]] == [
+        "Certamen 1",
+        "Total categoría: Certámenes",
+        "Total del ramo",
+    ]
+
+
+def test_avisos_y_foros_foro_inexistente(aula):
+    with pytest.raises(ErrorAula, match="no tiene un foro con id 999"):
+        correr(aula.avisos_y_foros("pds", foro_id=999))
+
+
+def test_contactos_ramo_usa_contactos_del_curso(aula, moodle):
+    # Sin lista de participantes, se usan los contactos públicos del curso.
+    moodle.fallar["core_enrol_get_enrolled_users"] = {
+        "exception": "x",
+        "errorcode": "nopermissions",
+        "message": "sin permiso",
+    }
+    r = correr(aula.contactos_ramo("pds"))
+    assert r["personas"] == [
+        {"nombre": "Profesora Uno", "rol": "Profesor/a", "correo": "no visible"}
+    ]
+
+
+def test_contactos_ramo_si_fallan_ambas_fuentes(aula, moodle):
+    error = {"exception": "x", "errorcode": "nopermissions", "message": "sin permiso"}
+    moodle.fallar["core_enrol_get_enrolled_users"] = error
+    moodle.fallar["core_course_get_courses_by_field"] = error
+    r = correr(aula.contactos_ramo("pds"))
+    assert r["personas"] == []
+    assert r["correos_mencionados"][0]["correo"] == "ana.ayudante@ejemplo.cl"
