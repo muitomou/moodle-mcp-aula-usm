@@ -10,7 +10,7 @@ materiales, notas, avisos y foros. Así puedes preguntarle cosas como:
 
 > «¿Qué tengo que entregar esta semana?»
 > «Léeme el enunciado de la Tarea 2 de Bioinformática y dime qué archivos necesito.»
-> «Baja las guías de la unidad 3 de pds a mi carpeta del ramo.»
+> «Baja las guías de la unidad 3 de Redes a mi carpeta del ramo.»
 > «¿Cómo voy en Inteligencia Artificial?»
 
 Está pensado para **Aula USM** (`https://aula.usm.cl`), pero funciona con cualquier Moodle
