@@ -165,10 +165,10 @@ class MoodleClient:
         """
         if not self.es_url_propia(url_archivo):
             raise MoodleError(f"URL de archivo fuera de {self.url}; no se envía el token.")
-        destino.parent.mkdir(parents=True, exist_ok=True)
         temporal = destino.with_name(destino.name + ".parcial")
         escritos = 0
         try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
             async with self._http.stream(
                 "GET", url_archivo, params={"token": self._exigir_token()}
             ) as r:
@@ -186,7 +186,14 @@ class MoodleClient:
             os.replace(temporal, destino)
         except httpx.HTTPError as e:
             raise self._error_de_red(e, f"descargar {destino.name}") from e
+        except OSError as e:
+            # Carpeta sin permisos, disco lleno, una ruta ocupada por un archivo, etc.
+            raise MoodleError(
+                f"No se pudo guardar {destino.name} en {destino.parent}: "
+                f"{e.strerror or e.__class__.__name__}.",
+                "disco",
+            ) from e
         finally:
-            if temporal.exists():
-                temporal.unlink()
+            with contextlib.suppress(OSError):
+                temporal.unlink(missing_ok=True)
         return escritos

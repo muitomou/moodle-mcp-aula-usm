@@ -499,3 +499,15 @@ def test_token_vencido_no_se_oculta_tras_un_respaldo(aula_con_token_vencido, con
         correr(consulta(aula_con_token_vencido))
     # Tampoco quedan archivos con el JSON de error en vez del PDF.
     assert not list((universidad / "Pruebas de Software").rglob("*.pdf"))
+
+
+def test_descarga_informa_errores_de_disco_y_sigue(aula, universidad):
+    # «General» existe como archivo: no se puede crear la carpeta de esa sección.
+    aula_dir = universidad / "Pruebas de Software" / "Aula"
+    aula_dir.mkdir()
+    (aula_dir / "General").write_text("estorbo")
+    r = correr(aula.descargar_material("INF331", todo=True))
+    error = next(e for e in r["errores"] if e["archivo"] == "programa.pdf")
+    assert error["error"].startswith("No se pudo guardar programa.pdf")
+    # Los demás archivos se descargan igual.
+    assert any(g["archivo"].endswith("guia1.pdf") for g in r["guardados"])
