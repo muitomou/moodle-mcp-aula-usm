@@ -11,6 +11,8 @@ python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
 
+En Windows, usa `py -m venv .venv` y `.venv\Scripts\` en vez de `.venv/bin/`.
+
 ## Antes de abrir un PR
 
 ```bash
