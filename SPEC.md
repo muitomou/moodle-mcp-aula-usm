@@ -31,7 +31,13 @@ Las variables de entorno tienen prioridad sobre `config.env`.
 1. Genera un `passport` aleatorio y abre
    `AULA_URL/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=…&urlscheme=moodlemobile`.
 2. El usuario inicia sesión (Microsoft, en el caso de la USM). Moodle redirige a
-   `moodlemobile://token=<base64>`; el usuario copia esa URL y la pega en la terminal.
+   `moodlemobile://token=<base64>`. `aula-mcp-enlace` está registrado como la aplicación de
+   ese esquema (`.desktop` + `xdg-mime` en Linux, `HKCU\Software\Classes\moodlemobile` en
+   Windows, una app AppleScript en `~/Applications` en macOS), así que el navegador se lo
+   entrega y este lo escribe en `~/.config/aula-mcp/enlace-pendiente` (permisos 600), donde
+   `aula-mcp-login` lo está esperando. No se reemplaza a otra aplicación que ya tenga el
+   esquema. Si no se puede registrar, si el usuario pulsa Enter o si pasan 10 minutos sin
+   respuesta, se vuelve al modo a mano: copiar la URL desde la consola del navegador y pegarla en la terminal.
 3. Se decodifica `firma:::token[:::tokenprivado]` y se verifica `firma == md5(AULA_URL + passport)`.
 4. Se valida con `core_webservice_get_site_info` y se guarda solo el `token`
    (el token privado se descarta).

@@ -13,11 +13,13 @@ import secrets
 import shutil
 import subprocess
 import sys
+import threading
 import webbrowser
 from getpass import getpass
 from pathlib import Path
 from urllib.parse import unquote
 
+from . import enlace
 from .carpetas import Carpetas
 from .config import Config, guardar_valor
 from .moodle import MoodleClient, MoodleError
@@ -37,6 +39,30 @@ INSTRUCCIONES_LOGIN = """
 Si el navegador no se abre, visita esta dirección:
   {url}
 """
+
+INSTRUCCIONES_AUTOMATICAS = """
+1. Se abrirá Aula en tu navegador. Inicia sesión normalmente (Microsoft).
+2. Al terminar, el navegador preguntará si quieres abrir el enlace con otra aplicación
+   (xdg-open, «Aula MCP Login» o similar). Acepta.
+3. Vuelve a esta terminal: el token se guarda solo.
+
+Si el navegador no pregunta nada, presiona Enter para hacerlo a mano.
+Si el navegador no se abre, visita esta dirección:
+  {url}
+"""
+
+INSTRUCCIONES_A_MANO = """
+Hagámoslo a mano:
+1. En el navegador, abre las herramientas de desarrollo (F12; en Mac, Cmd + Option + I)
+   en la pestaña «Consola».
+2. En esa misma pestaña, vuelve a abrir esta dirección (como ya iniciaste sesión, Aula
+   redirige de inmediato):
+     {url}
+3. La consola muestra un error tipo  Failed to launch 'moodlemobile://token=…'
+   Copia esa dirección completa y pégala aquí abajo. La entrada no se muestra en pantalla.
+"""
+
+ESPERA_MAXIMA = 600  # segundos esperando el enlace del navegador antes de pedirlo a mano
 
 
 def decodificar_lanzamiento(texto: str, url_sitio: str, passport: str) -> str:
@@ -73,6 +99,44 @@ async def _verificar(url: str, token: str) -> dict:
         await cliente.cerrar()
 
 
+def _esperar_enter(cancelado: threading.Event) -> None:
+    try:
+        input()
+    except (EOFError, OSError):
+        return
+    cancelado.set()
+
+
+def _token_desde_navegador(
+    url: str, passport: str, lanzamiento: str, abrir: bool, a_mano: bool
+) -> str:
+    """Abre el inicio de sesión y obtiene el token, idealmente sin que el usuario copie nada."""
+    registrado = False
+    if not a_mano:
+        registrado, mensaje = enlace.registrar()
+        print(("✓ " if registrado else "· ") + mensaje)
+    if not registrado:
+        print(INSTRUCCIONES_LOGIN.format(url=lanzamiento))
+        if abrir:
+            webbrowser.open(lanzamiento)
+        return decodificar_lanzamiento(getpass("URL moodlemobile://… : "), url, passport)
+
+    enlace.limpiar()
+    print(INSTRUCCIONES_AUTOMATICAS.format(url=lanzamiento))
+    if abrir:
+        webbrowser.open(lanzamiento)
+    cancelado = threading.Event()
+    if sys.stdin.isatty():
+        threading.Thread(target=_esperar_enter, args=(cancelado,), daemon=True).start()
+    while (recibido := enlace.esperar(ESPERA_MAXIMA, cancelado)) is not None:
+        try:
+            return decodificar_lanzamiento(recibido, url, passport)
+        except ValueError as e:
+            print(f"· Llegó un enlace que no sirve ({e}) Sigo esperando…")
+    print(INSTRUCCIONES_A_MANO.format(url=lanzamiento))
+    return decodificar_lanzamiento(getpass("URL moodlemobile://… : "), url, passport)
+
+
 def login() -> None:
     p = argparse.ArgumentParser(
         prog="aula-mcp-login", description="Obtiene y guarda el token de Moodle."
@@ -85,7 +149,21 @@ def login() -> None:
     )
     p.add_argument("--dir-base", help="Carpeta con una subcarpeta por ramo (para descargas)")
     p.add_argument("--no-abrir", action="store_true", help="No abrir el navegador automáticamente")
+    p.add_argument(
+        "--a-mano",
+        action="store_true",
+        help="Copiar el enlace moodlemobile:// desde la consola del navegador, como antes",
+    )
+    p.add_argument(
+        "--quitar-enlace",
+        action="store_true",
+        help="Dejar de abrir los enlaces moodlemobile:// con aula-mcp y salir",
+    )
     a = p.parse_args()
+
+    if a.quitar_enlace:
+        print(enlace.quitar())
+        return
 
     cfg = Config.cargar()
     url = (a.url or cfg.url).rstrip("/")
@@ -99,11 +177,9 @@ def login() -> None:
                 f"{url}/admin/tool/mobile/launch.php?service=moodle_mobile_app"
                 f"&passport={passport}&urlscheme=moodlemobile"
             )
-            print(INSTRUCCIONES_LOGIN.format(url=lanzamiento))
-            if not a.no_abrir:
-                webbrowser.open(lanzamiento)
-            pegado = getpass("URL moodlemobile://… : ")
-            token = decodificar_lanzamiento(pegado, url, passport)
+            token = _token_desde_navegador(
+                url, passport, lanzamiento, abrir=not a.no_abrir, a_mano=a.a_mano
+            )
     except (ValueError, KeyboardInterrupt, EOFError) as e:
         sys.exit(f"\n✗ {e}" if str(e) else "\nCancelado.")
 

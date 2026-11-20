@@ -13,6 +13,9 @@ usa [versionado semántico](https://semver.org/lang/es/).
 - Instalación en un solo comando con `uv tool install` (o `pipx`) directo desde GitHub, sin
   clonar el repositorio.
 - Instrucciones para Windows y tests en macOS y Windows en CI.
+- `aula-mcp-login` recibe el token directo del navegador: ya no hace falta abrir la consola
+  ni copiar la URL `moodlemobile://`. El modo anterior sigue disponible con `--a-mano`, y
+  `--quitar-enlace` deshace el registro.
 
 ## [0.1.0] - 2026-11-20
 

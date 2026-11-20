@@ -102,13 +102,29 @@ aula-mcp-login --dir-base ~/Escritorio/UNIVERSIDAD
 `--dir-base` es opcional: es la carpeta donde tienes una subcarpeta por ramo, para que las
 descargas queden ordenadas (ver [Carpetas por ramo](#carpetas-por-ramo)).
 
-1. Se abre Aula en tu navegador. **Antes de iniciar sesión**, abre las herramientas de
-   desarrollo (F12; en Mac, Cmd + Option + I) en la pestaña *Consola*.
-2. Inicia sesión normalmente.
-3. Moodle intenta abrir la app y la consola muestra
-   `Failed to launch 'moodlemobile://token=…'`. Copia esa URL completa.
-4. Pégala en la terminal. El programa verifica la firma, prueba el token y lo guarda en
-   `~/.config/aula-mcp/config.env` (en macOS y Linux, con permisos `600`).
+1. Se abre Aula en tu navegador. Inicia sesión normalmente.
+2. Al terminar, el navegador pregunta si quieres abrir el enlace con otra aplicación
+   (*xdg-open*, *Aula MCP Login* o similar). Acepta.
+3. Vuelve a la terminal: el programa recibe el enlace, verifica la firma, prueba el token y
+   lo guarda en `~/.config/aula-mcp/config.env` (en macOS y Linux, con permisos `600`).
+
+Para que el navegador le entregue el enlace, `aula-mcp-login` registra el comando
+`aula-mcp-enlace` como la aplicación que abre los enlaces `moodlemobile://` (los mismos que
+usa la app móvil de Moodle). Si otra aplicación ya los abre, no la reemplaza. Para deshacer
+el registro: `aula-mcp-login --quitar-enlace`.
+
+<details>
+<summary>Si el navegador no pregunta nada (modo a mano)</summary>
+
+Presiona Enter en la terminal, o usa `aula-mcp-login --a-mano` desde el principio:
+
+1. Abre las herramientas de desarrollo del navegador (F12; en Mac, Cmd + Option + I) en la
+   pestaña *Consola*.
+2. Abre la dirección que muestra la terminal. Moodle intenta abrir la app y la consola
+   muestra `Failed to launch 'moodlemobile://token=…'`. Copia esa URL completa.
+3. Pégala en la terminal.
+
+</details>
 
 Si ya tienes un token (por ejemplo, en *Preferencias → Claves de seguridad*), usa
 `aula-mcp-login --token`.
