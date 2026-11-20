@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import threading
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -129,7 +129,7 @@ def test_registro_linux(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     monkeypatch.setattr(enlace.shutil, "which", lambda c: f"/usr/bin/{c}")
     monkeypatch.setattr(enlace.subprocess, "run", run)
-    ok, _ = enlace._registrar_linux(Path("/opt/mi app/100%/aula-mcp-enlace"))
+    ok, _ = enlace._registrar_linux(PurePosixPath("/opt/mi app/100%/aula-mcp-enlace"))
     assert ok
     desktop = (tmp_path / "applications" / enlace.NOMBRE_DESKTOP).read_text()
     assert 'Exec="/opt/mi app/100%%/aula-mcp-enlace" %u' in desktop
