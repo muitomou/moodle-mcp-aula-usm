@@ -7,6 +7,10 @@ usa [versionado semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Añadido
+
+- GIF de demostración en el README.
+
 ## [0.1.0] - 2026-11-20
 
 Primera versión pública.

@@ -20,12 +20,9 @@ que tenga habilitado el servicio de la app móvil oficial (`moodle_mobile_app`).
 
 ## Demo
 
-<!--
-  Pendiente: grabar el GIF, guardarlo en docs/demo.gif y descomentar la línea de abajo.
-  Antes de subirlo, revisar que no se vean notas, nombres, correos ni el token.
+Claude Code consulta las entregas de las próximas dos semanas con `proximas_entregas`:
 
-  ![Claude respondiendo «¿Qué tengo que entregar esta semana?» con aula-mcp](docs/demo.gif)
--->
+![Claude Code respondiendo «¿qué tareas tengo con fecha de entrega en las próximas dos semanas?» con aula-mcp](docs/demo.gif)
 
 ## Qué puede hacer
 
