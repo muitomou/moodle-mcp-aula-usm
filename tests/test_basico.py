@@ -232,3 +232,31 @@ def test_errores_de_red_con_mensaje_claro(tmp_path, error, mensaje):
 def test_timeout_por_defecto():
     cliente = MoodleClient(URL, "tok")
     assert cliente._http.timeout.connect == 10.0 and cliente._http.timeout.read == 30.0
+
+
+def _cliente_que_responde(respuesta):
+    return MoodleClient(
+        URL, "tok", transport=httpx.MockTransport(lambda r: httpx.Response(200, json=respuesta))
+    )
+
+
+def test_token_vencido_por_accessexception():
+    # Moodle lanza webservice_access_exception (errorcode accessexception) si el token venció.
+    cliente = _cliente_que_responde(
+        {
+            "exception": "webservice_access_exception",
+            "errorcode": "accessexception",
+            "message": "Excepción de control de acceso",
+        }
+    )
+    with pytest.raises(MoodleError, match="aula-mcp-login") as e:
+        correr(cliente.llamar("core_webservice_get_site_info"))
+    assert e.value.codigo == "accessexception" and not isinstance(e.value, TokenInvalido)
+
+
+def test_sitio_en_mantencion():
+    cliente = _cliente_que_responde(
+        {"exception": "moodle_exception", "errorcode": "sitemaintenance", "message": "..."}
+    )
+    with pytest.raises(MoodleError, match="mantención"):
+        correr(cliente.llamar("core_webservice_get_site_info"))

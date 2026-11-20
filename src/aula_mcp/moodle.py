@@ -127,6 +127,16 @@ class MoodleClient:
             raise TokenInvalido(
                 "El token no es válido o expiró. Ejecuta `aula-mcp-login` para renovarlo.", codigo
             )
+        if codigo == "accessexception":
+            # Moodle responde así a un token vencido (validuntil), pero también a una función que
+            # el servicio no permite; por eso no es TokenInvalido.
+            raise MoodleError(
+                f"Moodle denegó el acceso a {funcion}. Si todas las consultas fallan igual, el "
+                "token probablemente expiró: renuévalo con `aula-mcp-login`.",
+                codigo,
+            )
+        if codigo == "sitemaintenance":
+            raise MoodleError("El sitio está en mantención. Intenta de nuevo más tarde.", codigo)
         raise MoodleError(f"Moodle rechazó {funcion}: {mensaje} ({codigo})", codigo)
 
     def es_url_propia(self, url: str) -> bool:
