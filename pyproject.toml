@@ -42,6 +42,10 @@ aula-mcp-login = "aula_mcp.cli:login"
 aula-mcp-check = "aula_mcp.cli:check"
 aula-mcp-desktop = "aula_mcp.cli:desktop"
 
+[project.gui-scripts]
+# Lo abre el navegador con el enlace moodlemobile://; en Windows no muestra una consola.
+aula-mcp-enlace = "aula_mcp.enlace:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/aula_mcp"]
 
