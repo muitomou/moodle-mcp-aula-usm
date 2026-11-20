@@ -29,6 +29,11 @@ class TokenInvalido(MoodleError):
     pass
 
 
+# 30 s para leer (Moodle puede tardar en armar respuestas grandes), pero solo 10 s para conectar:
+# si no hay red, conviene saberlo pronto.
+TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+
+
 def aplanar(valor: Any, prefijo: str = "") -> dict[str, str]:
     """Convierte parámetros anidados al formato de Moodle: {'ids': [1]} → {'ids[0]': '1'}."""
     salida: dict[str, str] = {}
@@ -52,7 +57,7 @@ class MoodleClient:
         token: str | None,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
-        timeout: float = 30.0,
+        timeout: float | httpx.Timeout = TIMEOUT,
     ):
         self.url = url.rstrip("/")
         self.token = token
@@ -84,7 +89,7 @@ class MoodleClient:
         try:
             r = await self._http.post(f"{self.url}/webservice/rest/server.php", data=datos)
         except httpx.HTTPError as e:
-            raise MoodleError(f"No se pudo conectar con {self.url}: {e.__class__.__name__}") from e
+            raise self._error_de_red(e, f"consultar {funcion}") from e
         if r.status_code != 200:
             raise MoodleError(f"Moodle respondió HTTP {r.status_code} en {funcion}.")
         try:
@@ -93,6 +98,24 @@ class MoodleClient:
             raise MoodleError(f"Moodle devolvió una respuesta que no es JSON en {funcion}.") from e
         self._revisar_error(respuesta, funcion)
         return respuesta
+
+    def _error_de_red(self, e: httpx.HTTPError, accion: str) -> MoodleError:
+        """Traduce un error de httpx a un mensaje que el usuario pueda entender."""
+        if isinstance(e, httpx.TimeoutException):
+            return MoodleError(
+                f"{self.url} no respondió a tiempo al {accion}. El sitio puede estar lento o "
+                "caído; intenta de nuevo en unos minutos.",
+                "timeout",
+            )
+        if isinstance(e, httpx.ConnectError):
+            return MoodleError(
+                f"No se pudo conectar con {self.url} al {accion}. Revisa tu conexión a internet "
+                "y la URL configurada en AULA_URL.",
+                "sinconexion",
+            )
+        return MoodleError(
+            f"Error de red con {self.url} al {accion} ({e.__class__.__name__}).", "red"
+        )
 
     @staticmethod
     def _revisar_error(respuesta: Any, funcion: str) -> None:
@@ -136,7 +159,7 @@ class MoodleClient:
                     self._revisar_error(json.loads(temporal.read_bytes()), "descarga")
             os.replace(temporal, destino)
         except httpx.HTTPError as e:
-            raise MoodleError(f"Falló la descarga de {destino.name}: {e.__class__.__name__}") from e
+            raise self._error_de_red(e, f"descargar {destino.name}") from e
         finally:
             if temporal.exists():
                 temporal.unlink()

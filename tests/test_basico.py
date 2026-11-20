@@ -205,3 +205,30 @@ def test_extraer_texto_trunca(tmp_path, monkeypatch):
     (tmp_path / "a.txt").write_text("x" * 50)
     r = lectura.extraer_texto(tmp_path / "a.txt")
     assert r["truncado"] and len(r["texto"]) == 10
+
+
+@pytest.mark.parametrize(
+    "error, mensaje",
+    [
+        (httpx.ReadTimeout, "no respondió a tiempo"),
+        (httpx.ConnectTimeout, "no respondió a tiempo"),
+        (httpx.ConnectError, "Revisa tu conexión a internet"),
+        (httpx.RemoteProtocolError, r"Error de red .* \(RemoteProtocolError\)"),
+    ],
+)
+def test_errores_de_red_con_mensaje_claro(tmp_path, error, mensaje):
+    def falla(request):
+        raise error("detalle interno", request=request)
+
+    cliente = MoodleClient(URL, "tok", transport=httpx.MockTransport(falla))
+    with pytest.raises(MoodleError, match=mensaje) as e:
+        correr(cliente.llamar("core_webservice_get_site_info"))
+    assert "core_webservice_get_site_info" in str(e.value)
+    with pytest.raises(MoodleError, match=mensaje):
+        correr(cliente.descargar(f"{URL}/webservice/pluginfile.php/1/a.pdf", tmp_path / "a.pdf"))
+    assert list(tmp_path.iterdir()) == []  # no deja archivos a medias
+
+
+def test_timeout_por_defecto():
+    cliente = MoodleClient(URL, "tok")
+    assert cliente._http.timeout.connect == 10.0 and cliente._http.timeout.read == 30.0
